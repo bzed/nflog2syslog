@@ -6,7 +6,8 @@ Rules-Requires-Root: no
 Build-Depends:
  debhelper-compat (= 13),
  cargo:native,
- rustc:native (>= 1.85),
+# minimum driven by the dependency set: time 0.3.55 requires rustc 1.88
+ rustc:native (>= 1.88),
  libstd-rust-dev,
 Standards-Version: 4.7.2
 

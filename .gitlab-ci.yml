@@ -3,8 +3,9 @@ include:
   - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/pipeline-jobs.yml
 
 variables:
-  # rustc >= 1.85 needed (packet-dissector 0.6), so trixie or newer
-  RELEASE: 'trixie'
+  # salsa sbuild builds with the distro rustc, which must be >= 1.88
+  # (time 0.3.55); sid ships a current one
+  RELEASE: 'sid'
   SALSA_CI_DISABLE_APTLY: 0
   SALSA_CI_DISABLE_AUTOPKGTEST: 0
   SALSA_CI_DISABLE_BLHC: 1

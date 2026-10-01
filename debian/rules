@@ -1,9 +1,15 @@
 #!/usr/bin/make -f
 # Plain debhelper + cargo (see Makefile "vendor" target for offline builds:
 # it creates vendor/ plus .cargo/config.toml so no network is needed).
-# During Debian builds PATH is sanitized: prefer the distro cargo (rustup
-# shims in ~/.cargo/bin cannot resolve a toolchain in that environment).
+#
+# Debian's rustc is often older than the dependencies need (time 0.3.55
+# requires 1.88), so builds can point CARGO at a rustup-installed cargo:
+#   CARGO=$HOME/.cargo/bin/cargo dpkg-buildpackage -us -uc -b -d
 
+CARGO ?= cargo
+
+# prefer distro cargo over rustup shims when both are installed (rustup
+# proxies cannot always resolve a toolchain in the build environment)
 export PATH := /usr/bin:/bin:$(PATH)
 
 %:
@@ -13,10 +19,10 @@ override_dh_auto_clean:
 	rm -rf target
 
 override_dh_auto_build:
-	cargo build --release --locked
+	$(CARGO) build --release --locked
 
 override_dh_auto_test:
-	cargo test --release --locked
+	$(CARGO) test --release --locked
 
 override_dh_dwz:
 	# dwz fails on Rust binaries; cargo already stripped the release build

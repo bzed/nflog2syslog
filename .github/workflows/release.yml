@@ -41,10 +41,23 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential cargo rustc debhelper lintian git ca-certificates
+            build-essential debhelper lintian git ca-certificates curl
+      - name: install rust via rustup
+        # Debian's rustc is older than the dependency set needs (time 0.3.55
+        # requires rustc 1.88) and the packaged rustup fails in containers,
+        # so use the upstream installer
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          # point the debian/rules CARGO indirection at the real toolchain
+          # binary, not the rustup shim (shims are fragile in sanitized
+          # build environments)
+          echo "CARGO=$(rustup which cargo)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - run: make vendor
-      - run: dpkg-buildpackage -us -uc -b
+      # -d: toolchain comes from rustup, not from Debian packages
+      - run: dpkg-buildpackage -us -uc -b -d
       - run: lintian ../nflog2syslog_*.deb
       - name: move artifacts into the workspace
         run: mv ../nflog2syslog_*.deb .

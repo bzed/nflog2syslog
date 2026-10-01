@@ -168,6 +168,13 @@ Expected: `.deb` builds (vendor/ makes it offline-capable; without
 vendor/, the build host needs network to fetch crates); lintian reports
 nothing fatal for a native initial release.
 
+Note on rustc: the dependency set needs rustc >= 1.88 (time 0.3.55). On
+hosts with an older distro rustc, point the build at a rustup toolchain:
+
+```bash
+CARGO="$(rustup which cargo)" dpkg-buildpackage -us -uc -b -d
+```
+
 Note: the package `Conflicts`/`Replaces` `nflog-to-syslog` — installing it
 on a box that has the old Go tool removes that package in the same dpkg
 run (verify on the VM: `dpkg -l nflog-to-syslog` shows no ii afterwards).

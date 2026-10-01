@@ -80,8 +80,9 @@ Rust >= 1.85 (packet-dissector 0.6 requirement).
   as artifacts), coverage (cargo-llvm-cov uploaded to Codecov), the
   unprivileged EPERM smoke test, the root-only end-to-end integration test
   (runners have passwordless sudo), and a Debian package build with lintian
-  inside a `debian:trixie` container (the oldest distro toolchain that
-  satisfies rustc >= 1.85). Pushing a `v*` tag publishes a GitHub release
+  inside a `debian:trixie` container (the Rust toolchain comes from rustup,
+  since Debian's rustc is older than the dependency set needs). Pushing a
+  `v*` tag publishes a GitHub release
   with the binary tarball, the `.deb`, and checksums.
 - Coverage and test results are uploaded to [Codecov](https://about.codecov.io/):
   set a `CODECOV_TOKEN` repository secret for private repositories (the

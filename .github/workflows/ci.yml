@@ -66,7 +66,7 @@ jobs:
       - name: run tests with coverage instrumentation
         run: cargo llvm-cov --codecov --output-path coverage.json
       - name: upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.json
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -112,9 +112,10 @@ jobs:
           sudo NFLOG2SYSLOG_BIN=$PWD/target/release/nflog2syslog
           bash scripts/root-integration-test.sh
 
-  # TESTING.md §7: Debian package build + lintian. debian:trixie is the
-  # oldest Debian with rustc >= 1.85 (packet-dissector 0.6 requirement),
-  # so it doubles as the minimum-build-environment check.
+  # TESTING.md §7: Debian package build + lintian in a debian:trixie
+  # container. The rust toolchain comes from rustup, not Debian: the
+  # dependency set needs rustc >= 1.88 (time 0.3.55) which trixie does
+  # not ship.
   packaging:
     runs-on: ubuntu-latest
     container:
@@ -124,10 +125,24 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential cargo rustc debhelper lintian git ca-certificates
+            build-essential debhelper lintian git ca-certificates curl
+      - name: install rust via rustup
+        # Debian's rustc is older than the dependency set needs (time 0.3.55
+        # requires rustc 1.88) and the packaged rustup fails in containers,
+        # so use the upstream installer
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          # point the debian/rules CARGO indirection at the real toolchain
+          # binary, not the rustup shim (shims are fragile in sanitized
+          # build environments)
+          echo "CARGO=$(rustup which cargo)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - run: make vendor
-      - run: dpkg-buildpackage -us -uc -b
+      # -d skips the Build-Depends check: the toolchain comes from rustup,
+      # not from the Debian packages the control file declares
+      - run: dpkg-buildpackage -us -uc -b -d
       - run: lintian ../nflog2syslog_*.deb
       - name: move artifacts into the workspace
         run: mv ../nflog2syslog_*.deb ../nflog2syslog_*.buildinfo ../nflog2syslog_*.changes .
