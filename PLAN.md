@@ -2,7 +2,9 @@
 
 Implementation plan and benefit analysis.
 
-Status: draft v1
+Status: phases 1–5 implemented (initial commit), verified by unit tests,
+clippy, and a live kernel handshake check. Phases 6–8 (root integration
+test, packaging, license decision) are open — see §8.
 
 ## 1. Benefit analysis
 
@@ -58,7 +60,10 @@ Rejected: `nflog` crate (GPL-2.0+ FFI), `pktparse` (LGPL-3.0), `etherparse` /
 `pnet_packet` (fine but strictly less coverage than packet-dissector),
 `dnssector` (ISC — unnecessary, packet-dissector-dns covers DNS),
 `hickory-proto`/`dhcproto`/`ntp-proto`/`rasn-snmp` (unneeded — the same
-protocols ship as packet-dissector family crates).
+protocols ship as packet-dissector family crates), and `neli` (viable for
+the wire module, but netlink-packet-core needs less ceremony for one
+custom protocol and is the same crate family the rtnetlink/audit tooling
+is built on).
 
 ## 4. Architecture
 
@@ -177,22 +182,48 @@ Semantics follow the old tool where names match (`--nflog-group` default 0,
 
 ## 8. Phases
 
-1. **Scaffold**: cargo project, CI config, clippy/rustfmt clean skeleton.
+1. **Scaffold**: cargo project, clippy/rustfmt clean skeleton. — **done**
 2. **Wire module**: nfnetlink_log constants, config request encoding, ACK
    handling, packet attribute parsing. Unit tests with hand-built byte
    fixtures (round-trip + known vectors). This is the highest-risk module —
-   integration-tested against a real kernel in phase 6.
+   integration-tested against a real kernel in phase 6. — **done**
+   (`src/wire.rs`, byte-exact fixtures in `tests/wire.rs`; handshake verified
+   against a real kernel: unprivileged config requests get a correctly parsed
+   EPERM NACK)
 3. **Pipeline**: recv thread, worker, sink threads, bounded queues, drop
-   counters, stats reporting, signal handling, CLI.
+   counters, stats reporting, signal handling, CLI. — **done**
+   (`src/receiver.rs`, `src/stats.rs`, `src/cli.rs`, `src/main.rs`)
 4. **Dissection glue**: entry-point selection (DLT_RAW for IP-family hwproto,
    ARP entry for ETH_P_ARP), JSON builder, golden tests for representative
-   packets (IPv4/TCP, IPv6/UDP/DNS, ARP, ICMP, GRE, VLAN).
-5. **Syslog sinks**: local, UDP, TCP; local-output mode.
-6. **Integration test**: optional, root-only (`cargo test --ignored`):
+   packets (IPv4/TCP, IPv6/UDP/DNS, ARP, ICMP, GRE, VLAN). — **done**
+   (`src/dissect.rs`, `src/format.rs`, `tests/dissect.rs` covers IPv4/UDP/DNS,
+   IPv6/UDP, ARP, malformed payloads; ICMP/GRE/VLAN goldens can be added as
+   follow-up test vectors)
+5. **Syslog sinks**: local, UDP, TCP; local-output mode. — **done**
+   (`src/sinks.rs`)
+6. **Integration test**: root-only (`cargo test --ignored`):
    `unshare -n` + iptables NFLOG rule + crafted packets, assert JSON lines.
+   — **open** (needs root; exercises the full packet path for the first time)
 7. **Packaging**: systemd unit, Debian packaging (dh-cargo + vendored crates),
-   release binaries (musl static).
+   release binaries (musl static). — **open**
 8. **License decision**: freeze deps, pick license, add LICENSE + headers.
+   — **open** (all current deps are MIT OR Apache-2.0)
+
+## 8a. Implementation findings (worth keeping in mind)
+
+- `netlink-sys` 0.9 `Socket::recv` takes a `bytes::BufMut`: it writes into the
+  buffer's spare capacity *past* `len` and advances. Buffers must be
+  `Vec::with_capacity(n)` and `clear()`ed before each receive; the received
+  data is what `recv` appended, not `buf[..return_value]`.
+- `nfulnl_msg_packet_hdr` is `{ __be16 hw_protocol; __u8 hook; __u8 _pad }`:
+  the hook is byte 2. go-nflog (and therefore the old Go tool) reads byte 3,
+  the pad field — harmless there because the hook was never logged, but
+  clean-rooming from the uapi header avoids this class of bug.
+- `netlink-packet-core` marks `NetlinkHeader`/`NetlinkMessage`/`NetlinkPayload`
+  as `#[non_exhaustive]`: build messages via `NetlinkMessage::new`,
+  `NetlinkHeader::default()` + field mutation, and variant constructors.
+- libc constants: `ARPHRD_*` are `u16`, `ETH_P_*` are `i32` (in the current
+  libc version) — keep the casts local to the name tables.
 
 ## 9. Risks
 
