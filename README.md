@@ -70,6 +70,19 @@ cargo clippy --all-targets
 
 Rust >= 1.85 (packet-dissector 0.6 requirement).
 
+## CI and releases
+
+- GitHub Actions (`.github/workflows/`): on every push/PR — format, clippy,
+  unit tests, the unprivileged EPERM smoke test, the root-only end-to-end
+  integration test (runners have passwordless sudo), and a Debian package
+  build with lintian inside a `debian:trixie` container (the oldest distro
+  toolchain that satisfies rustc >= 1.85). Pushing a `v*` tag publishes a
+  GitHub release with the binary tarball, the `.deb`, and checksums.
+- GitLab CI (`.gitlab-ci.yml`): salsa-ci package build plus the same
+  compile/lint/test jobs.
+
+See `TESTING.md` for the full manual checklist.
+
 ## Debian packaging
 
 ```

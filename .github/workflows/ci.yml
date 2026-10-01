@@ -1,0 +1,99 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # TESTING.md §1
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add rustfmt
+      - run: cargo fmt --check
+
+  # TESTING.md §1
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup component add clippy
+      - run: cargo clippy --all-targets -- -D warnings
+
+  # TESTING.md §2
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked
+
+  # TESTING.md §3: unprivileged run must fail cleanly with EPERM
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: expect a clean EPERM failure (exit 1)
+        run: |
+          set +e
+          out=$(./target/release/nflog2syslog --nflog-group 7 --stdout 2>&1)
+          rc=$?
+          set -e
+          echo "$out"
+          if [ "$rc" -ne 1 ]; then
+            echo "::error::expected exit code 1, got $rc"
+            exit 1
+          fi
+          echo "$out" | grep -q "Operation not permitted" || {
+            echo "::error::expected a kernel NACK (Operation not permitted) on stderr"
+            exit 1
+          }
+
+  # TESTING.md §4: full kernel round-trip. GitHub runners have
+  # passwordless sudo, so the root-only integration test runs here.
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: load the nfnetlink_log kernel module
+        run: sudo modprobe nfnetlink_log || true
+      - name: root integration test
+        run: >
+          sudo NFLOG2SYSLOG_BIN=$PWD/target/release/nflog2syslog
+          bash scripts/root-integration-test.sh
+
+  # TESTING.md §7: Debian package build + lintian. debian:trixie is the
+  # oldest Debian with rustc >= 1.85 (packet-dissector 0.6 requirement),
+  # so it doubles as the minimum-build-environment check.
+  packaging:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+      - name: install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential cargo rustc debhelper lintian git ca-certificates
+      - uses: actions/checkout@v4
+      - run: make vendor
+      - run: dpkg-buildpackage -us -uc -b
+      - run: lintian ../nflog2syslog_*.deb
+      - name: move artifacts into the workspace
+        run: mv ../nflog2syslog_*.deb ../nflog2syslog_*.buildinfo ../nflog2syslog_*.changes .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path:
+            nflog2syslog_*.deb
+          retention-days: 14

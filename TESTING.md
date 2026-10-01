@@ -5,6 +5,15 @@ from cheap to expensive; each states what it proves. Everything in §1–§3
 runs unprivileged in seconds; §4 needs root; §5–§7 are runtime and
 packaging checks.
 
+Automated coverage: §1–§4 and §7 (deb build + lintian) run on every push
+and pull request via GitHub Actions (`.github/workflows/ci.yml`) — the
+root integration test runs there because GitHub runners have passwordless
+sudo. GitLab CI (`.gitlab-ci.yml`) additionally builds the Debian package
+with salsa-ci. Pushing a `v*` tag triggers `.github/workflows/release.yml`,
+which publishes the binary tarball, the `.deb`, and checksums as a GitHub
+release. The checks below are what CI runs — run them manually when
+working locally, or read them as documentation of what CI enforces.
+
 ## 1. Static checks (no root)
 
 ```bash

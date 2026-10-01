@@ -1,0 +1,76 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # release binary for the runner platform (release profile already strips)
+  binary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: package the binary
+        run: |
+          mkdir -p dist
+          cp target/release/nflog2syslog dist/
+          cd dist
+          tar czf "nflog2syslog-${GITHUB_REF_NAME}-x86_64-linux-gnu.tar.gz" nflog2syslog
+          rm nflog2syslog
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-binary
+          path: dist/
+          retention-days: 7
+
+  # Debian package, built against the oldest supported distro toolchain
+  deb:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+      - name: install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential cargo rustc debhelper lintian git ca-certificates
+      - uses: actions/checkout@v4
+      - run: make vendor
+      - run: dpkg-buildpackage -us -uc -b
+      - run: lintian ../nflog2syslog_*.deb
+      - name: move artifacts into the workspace
+        run: mv ../nflog2syslog_*.deb .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-deb
+          path: nflog2syslog_*.deb
+          retention-days: 7
+
+  publish:
+    needs: [binary, deb]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: checksums
+        run: |
+          cd dist
+          sha256sum ./* > SHA256SUMS
+      - name: create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "nflog2syslog ${GITHUB_REF_NAME}" \
+            --generate-notes
