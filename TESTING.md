@@ -8,7 +8,9 @@ packaging checks.
 Automated coverage: §1–§4 and §7 (deb build + lintian) run on every push
 and pull request via GitHub Actions (`.github/workflows/ci.yml`) — the
 root integration test runs there because GitHub runners have passwordless
-sudo. GitLab CI (`.gitlab-ci.yml`) additionally builds the Debian package
+sudo. Test results (JUnit XML via cargo-nextest) are published as PR
+comments/artifacts, and coverage (cargo-llvm-cov) is uploaded to Codecov
+(needs a CODECOV_TOKEN secret on private repos). GitLab CI (`.gitlab-ci.yml`) additionally builds the Debian package
 with salsa-ci. Pushing a `v*` tag triggers `.github/workflows/release.yml`,
 which publishes the binary tarball, the `.deb`, and checksums as a GitHub
 release. The checks below are what CI runs — run them manually when

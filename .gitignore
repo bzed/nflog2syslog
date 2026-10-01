@@ -1,6 +1,7 @@
 /target
 /vendor
 /.cargo
+/coverage.json
 # Debian package build outputs
 debian/nflog2syslog/
 debian/files

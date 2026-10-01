@@ -1,0 +1,6 @@
+# cargo-nextest CI profile: emit a JUnit XML report for test-result
+# uploads (codecov/basic-test-results) and CI artifacts.
+# Note: nextest resolves the path inside target/nextest/<profile>/,
+# so the report lands at target/nextest/ci/junit.xml.
+[profile.ci.junit]
+path = "junit.xml"
