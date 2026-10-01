@@ -106,11 +106,7 @@ impl Receiver {
     /// Receive loop: parse NFLOG packets off the socket and hand them to
     /// the pipeline queue. Never blocks on downstream work — a full queue
     /// drops with accounting.
-    pub fn run(
-        &mut self,
-        queue: SyncSender<NflogPacket>,
-        shutdown: &AtomicBool,
-    ) {
+    pub fn run(&mut self, queue: SyncSender<NflogPacket>, shutdown: &AtomicBool) {
         let mut buf: Vec<u8> = Vec::with_capacity(1024 * 1024);
         loop {
             if shutdown.load(Ordering::Relaxed) {
@@ -201,5 +197,8 @@ used SO_RCVBUF: size is capped by net.core.rmem_max"
         );
         return Ok(());
     }
-    Err(format!("setsockopt SO_RCVBUF: {}", std::io::Error::last_os_error()))
+    Err(format!(
+        "setsockopt SO_RCVBUF: {}",
+        std::io::Error::last_os_error()
+    ))
 }

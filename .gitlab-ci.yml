@@ -1,0 +1,63 @@
+include:
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/salsa-ci.yml
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/pipeline-jobs.yml
+
+variables:
+  # rustc >= 1.85 needed (packet-dissector 0.6), so trixie or newer
+  RELEASE: 'trixie'
+  SALSA_CI_DISABLE_APTLY: 0
+  SALSA_CI_DISABLE_AUTOPKGTEST: 0
+  SALSA_CI_DISABLE_BLHC: 1
+  SALSA_CI_DISABLE_LINTIAN: 1
+  SALSA_CI_DISABLE_PIUPARTS: 0
+  SALSA_CI_DISABLE_DEBREBUILD: 1
+  SALSA_CI_DISABLE_BUILD_PACKAGE_ALL: 0
+  SALSA_CI_DISABLE_BUILD_PACKAGE_ANY: 0
+  SALSA_CI_DISABLE_CROSSBUILD_ARM64: 1
+  SALSA_CI_REPROTEST_ENABLE_DIFFOSCOPE: 0
+  SALSA_CI_DISABLE_BUILD_PACKAGE_ARM64: 1
+  SALSA_CI_DISABLE_BUILD_PACKAGE_I386: 1
+  SALSA_CI_DISABLE_VERSION_BUMP: 0
+  # crates.io fetch during the Debian package build
+  SALSA_CI_SBUILD_ARGS: "--enable-network"
+
+image: rust:latest
+
+stages:
+  - build
+  - test
+
+compile:
+  stage: build
+  script:
+    - cargo build --release --locked
+    - mkdir -p build && cp target/release/nflog2syslog build/
+  artifacts:
+    paths:
+      - build
+    expire_in: 1 week
+
+format:
+  stage: test
+  script:
+    - rustup component add rustfmt
+    - cargo fmt --check
+
+clippy:
+  stage: test
+  script:
+    - rustup component add clippy
+    - cargo clippy --all-targets -- -D warnings
+
+test:
+  stage: test
+  script:
+    - cargo test --locked
+
+run:
+  stage: test
+  needs:
+    - job: compile
+      artifacts: true
+  script:
+    - build/nflog2syslog --help

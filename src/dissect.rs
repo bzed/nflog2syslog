@@ -3,8 +3,8 @@
 
 use packet_dissector::dissectors::arp::ArpDissector;
 use packet_dissector::field::{Field, FieldValue};
-use packet_dissector::packet::Layer;
 pub use packet_dissector::packet::DissectBuffer;
+use packet_dissector::packet::Layer;
 use packet_dissector::registry::DissectorRegistry;
 use serde_json::{Map, Value};
 use std::ops::Range;
@@ -87,10 +87,7 @@ fn layer_to_json(buf: &DissectBuffer, layer: &Layer) -> Value {
         let Some(field) = fields.get(idx as usize) else {
             continue;
         };
-        obj.insert(
-            field.descriptor.name.to_string(),
-            field_to_json(buf, field),
-        );
+        obj.insert(field.descriptor.name.to_string(), field_to_json(buf, field));
     }
     Value::Object(obj)
 }

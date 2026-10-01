@@ -2,7 +2,7 @@
 //! nflog metadata (prefix, interfaces, uid/gid, ...) plus the
 //! dissected protocol layers.
 
-use crate::dissect::{Dissector, DissectBuffer};
+use crate::dissect::{DissectBuffer, Dissector};
 use crate::wire::NflogPacket;
 use serde_json::{Map, Value};
 use std::ffi::CStr;

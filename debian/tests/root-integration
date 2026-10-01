@@ -1,0 +1,6 @@
+#!/bin/sh
+# DEP-8 wrapper: runs the project's root integration test against the
+# installed binary (see scripts/root-integration-test.sh).
+set -e
+cd "$(dirname "$0")/../.."
+NFLOG2SYSLOG_BIN=/usr/sbin/nflog2syslog exec bash scripts/root-integration-test.sh

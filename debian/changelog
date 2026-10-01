@@ -1,0 +1,8 @@
+nflog2syslog (0.1.0-1) stable; urgency=medium
+
+  * Initial release of the clean-room Rust rewrite of nflog-to-syslog.
+    - JSON output per packet instead of key=value lines
+    - decoupled pipeline with bounded queues and drop accounting
+    - SO_RCVBUFFORCE socket sizing (fixes the ENOBUFS log-loss class)
+
+ -- Bernd Zeimetz <bzed@debian.org>  Wed, 30 Sep 2026 12:00:00 +0200

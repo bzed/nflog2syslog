@@ -1,0 +1,14 @@
+# nflog2syslog configuration, read by the systemd unit
+# (/etc/systemd/system/nflog2syslog.service.d/*.conf can override).
+
+# Remote syslog destination, ip:port. Empty: send to the local syslog socket.
+DEST=""
+
+# Protocol for the remote syslog server: udp or tcp. Ignored when DEST is empty.
+PROTO=""
+
+# NFLOG group to listen on. Must match the --nflog-group of your iptables rules.
+NFLOG_GROUP="0"
+
+# Seconds between stderr statistics reports (drops, processed). 0 disables.
+STATS_INTERVAL="10"

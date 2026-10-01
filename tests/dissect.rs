@@ -16,8 +16,7 @@ fn format_packet(hw_protocol: u16, payload: &[u8]) -> Value {
     };
     let mut fmt = Formatter::new();
     let errors = AtomicU64::new(0);
-    let json: Value =
-        serde_json::from_str(&fmt.format(&pkt, &errors)).expect("valid JSON");
+    let json: Value = serde_json::from_str(&fmt.format(&pkt, &errors)).expect("valid JSON");
     assert_eq!(errors.load(std::sync::atomic::Ordering::Relaxed), 0);
     json
 }
@@ -35,7 +34,7 @@ fn ipv4_udp_dns() -> Vec<u8> {
     pkt.extend_from_slice(&[0x00, 0x00]); // checksum (not verified)
     pkt.extend_from_slice(&[10, 0, 0, 1]); // src
     pkt.extend_from_slice(&[10, 0, 0, 2]); // dst
-    // UDP: sport 40000, dport 53, len 8+dns_len, checksum 0
+                                           // UDP: sport 40000, dport 53, len 8+dns_len, checksum 0
     pkt.extend_from_slice(&40000u16.to_be_bytes());
     pkt.extend_from_slice(&53u16.to_be_bytes());
     pkt.extend_from_slice(&((8 + dns_len) as u16).to_be_bytes());
@@ -124,6 +123,76 @@ fn no_payload_is_null_layers() {
     assert!(json["layers"].is_null());
 }
 
+/// IPv4 + ICMP echo request.
+#[test]
+fn ipv4_icmp_layers() {
+    let mut pkt = Vec::new();
+    // IPv4: 20 bytes header, proto ICMP
+    pkt.extend_from_slice(&[0x45, 0x00]);
+    pkt.extend_from_slice(&28u16.to_be_bytes());
+    pkt.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    pkt.extend_from_slice(&[64, 1]);
+    pkt.extend_from_slice(&[0x00, 0x00]);
+    pkt.extend_from_slice(&[10, 0, 0, 1]);
+    pkt.extend_from_slice(&[10, 0, 0, 2]);
+    // ICMP echo request: type 8, code 0, checksum, id, seq
+    pkt.extend_from_slice(&[8, 0, 0x00, 0x00, 0xab, 0xcd, 0x00, 0x01]);
+
+    let json = format_packet(0x0800, &pkt);
+    let layers = &json["layers"];
+    assert!(layers.as_object().unwrap().contains_key("IPv4"));
+    assert!(
+        layers.as_object().unwrap().contains_key("ICMP"),
+        "layers: {layers}"
+    );
+}
+
+/// IPv4 + GRE + IPv4 (tunneling): the registry chains through GRE.
+#[test]
+fn ipv4_gre_tunnel_layers() {
+    // inner IPv4 header (20 bytes) + 8 bytes ICMP-ish payload
+    let mut inner = Vec::new();
+    inner.extend_from_slice(&[0x45, 0x00]);
+    inner.extend_from_slice(&28u16.to_be_bytes());
+    inner.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    inner.extend_from_slice(&[64, 1]);
+    inner.extend_from_slice(&[0x00, 0x00]);
+    inner.extend_from_slice(&[192, 168, 1, 1]);
+    inner.extend_from_slice(&[192, 168, 1, 2]);
+    inner.extend_from_slice(&[8, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+    // GRE header: flags/version 0x0000, protocol type IPv4 (0x0800)
+    let mut gre = Vec::new();
+    gre.extend_from_slice(&[0x00, 0x00, 0x08, 0x00]);
+    gre.extend_from_slice(&inner);
+
+    // outer IPv4 header, proto GRE (47)
+    let mut pkt = Vec::new();
+    let total = 20 + gre.len();
+    pkt.extend_from_slice(&[0x45, 0x00]);
+    pkt.extend_from_slice(&(total as u16).to_be_bytes());
+    pkt.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    pkt.extend_from_slice(&[64, 47]);
+    pkt.extend_from_slice(&[0x00, 0x00]);
+    pkt.extend_from_slice(&[10, 0, 0, 1]);
+    pkt.extend_from_slice(&[10, 0, 0, 2]);
+    pkt.extend_from_slice(&gre);
+
+    let json = format_packet(0x0800, &pkt);
+    let layers = &json["layers"];
+    let names: Vec<&str> = layers
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+    assert!(names.contains(&"IPv4"), "layers: {names:?}");
+    assert!(names.contains(&"GRE"), "layers: {names:?}");
+    // inner IPv4 layer: two IPv4 objects are merged by layer name; the
+    // important part is that dissection chained through the tunnel
+    assert!(names.contains(&"ICMP"), "layers: {names:?}");
+}
+
 /// IPv6 + UDP packet.
 #[test]
 fn ipv6_udp_layers() {
@@ -132,7 +201,7 @@ fn ipv6_udp_layers() {
     pkt.extend_from_slice(&[0x60, 0x00, 0x00, 0x00, 0x00, 0x08, 0x11, 0x40]);
     pkt.extend_from_slice(&[0xfd; 16]); // src
     pkt.extend_from_slice(&[0x01; 16]); // dst
-    // UDP
+                                        // UDP
     pkt.extend_from_slice(&12345u16.to_be_bytes());
     pkt.extend_from_slice(&514u16.to_be_bytes());
     pkt.extend_from_slice(&8u16.to_be_bytes());

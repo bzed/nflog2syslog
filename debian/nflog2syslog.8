@@ -1,0 +1,72 @@
+.TH NFLOG2SYSLOG 8 "2026-09-30" "nflog2syslog" "System Administration"
+.SH NAME
+nflog2syslog \- forward kernel NFLOG packets to syslog as JSON
+.SH SYNOPSIS
+.B nflog2syslog
+[\fB\-\-nflog\-group\fR \fIGROUP\fR] [\fB\-\-dest\fR \fIIP:PORT\fR] [\fB\-\-proto\fR \fIudp|tcp\fR]
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B nflog2syslog
+binds to a Linux kernel NFLOG group (netfilter's NFLOG target) over a
+netlink socket, dissects every logged packet into protocol layers
+(IPv4/IPv6, TCP/UDP, ICMP, ARP, GRE, DNS, DHCP, NTP, SNMP and more), and
+forwards one JSON object per packet to syslog — the local syslog socket by
+default, or a remote server via UDP or TCP.
+.PP
+The receive path is decoupled from the syslog sink through bounded queues:
+a stalled syslog server causes counted, reported drops instead of blocking
+the kernel socket. The netlink socket buffer is enlarged with
+SO_RCVBUFFORCE (falling back to SO_RCVBUF without CAP_NET_ADMIN).
+.PP
+Requires the CAP_NET_ADMIN capability (the NFLOG group bind needs it
+anyway). Statistics (processed, queue drops, kernel drops, sink errors)
+are written to stderr every \fB\-\-stats\-interval\fR seconds when nonzero.
+.SH OPTIONS
+.TP
+.BR \-\-nflog\-group " " \fIGROUP\fR
+NFLOG group to listen on; must match the \fB\-\-nflog\-group\fR of your
+iptables/nftables rules. Default: 0.
+.TP
+.BR \-\-dest " " \fIIP:PORT\fR
+Remote syslog destination. Empty (default) sends to the local syslog socket.
+.TP
+.BR \-\-proto " " \fIudp|tcp\fR
+Transport for the remote syslog server. Ignored without \fB\-\-dest\fR.
+.TP
+.BR \-\-copy\-range " " \fIN\fR
+Maximum number of packet bytes the kernel copies per logged packet.
+Default: 1024.
+.TP
+.BR \-\-rcvbuf " " \fIBYTES\fR
+Netlink socket receive buffer size. Default: 8388608 (8 MiB).
+.TP
+.BR \-\-queue\-size " " \fIN\fR
+Capacity of the internal pipeline queues. Default: 8192.
+.TP
+.B
+Copy every JSON message to stdout as well (useful under systemd/journald).
+.TP
+.BR \-\-local\-syslog
+Copy every JSON message to the local syslog socket as well.
+.TP
+.BR \-\-stats\-interval " " \fISECONDS\fR
+Seconds between stderr statistics reports; 0 disables. Default: 10.
+.TP
+.BR \-h ", " \-\-help
+Print help.
+.TP
+.BR \-V ", " \-\-version
+Print version.
+.SH FILES
+.TP
+.I /etc/default/nflog2syslog
+Default configuration read by the systemd unit
+(\fInflog2syslog.service\fR): DEST, PROTO, NFLOG_GROUP, STATS_INTERVAL.
+.SH SIGNALS
+.B SIGTERM / SIGINT
+trigger a graceful shutdown: the NFLOG group is unbound and queued
+messages are drained to the configured sinks before exiting.
+.SH SEE ALSO
+.BR iptables\-extensions (8),
+.BR syslog (3),
+.BR systemd (1)

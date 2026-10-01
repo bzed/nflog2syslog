@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+        adduser --system --group --home /var/lib/nfl2sl \
+            --quiet --gecos "nflog2syslog service" nfl2sl
+
+        if which restorecon >/dev/null 2>&1; then
+            restorecon /var/lib/nfl2sl
+        fi
+	;;
+    abort-upgrade|abort-deconfigure|abort-remove)
+	;;
+esac
+
+#DEBHELPER#

@@ -1,8 +1,8 @@
 //! Wire protocol tests: byte-exact fixtures for config request encoding and
 //! packet attribute parsing.
 
-use nflog2syslog::wire::{check_ack, message_ranges, ConfigRequest, NflogPacket};
 use netlink_packet_core::{NetlinkMessage, NetlinkPayload, NLMSG_ERROR};
+use nflog2syslog::wire::{check_ack, message_ranges, ConfigRequest, NflogPacket};
 
 fn serialize_request(request: &ConfigRequest, seq: u32) -> Vec<u8> {
     let mut msg = request.to_netlink_message(seq);
@@ -36,8 +36,7 @@ fn bind_group_request_bytes() {
     assert_eq!(
         buf,
         vec![
-            28, 0, 0, 0, 1, 4, 5, 0, 7, 0, 0, 0, 0, 0, 0, 0,
-            // nfgenmsg with res_id=32
+            28, 0, 0, 0, 1, 4, 5, 0, 7, 0, 0, 0, 0, 0, 0, 0, // nfgenmsg with res_id=32
             0, 0, 0, 32,
             // attr CFG_CMD: len=5, type=1, payload=NFULNL_CFG_CMD_BIND(1), padded
             5, 0, 1, 0, 1, 0, 0, 0,

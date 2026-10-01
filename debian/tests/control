@@ -1,0 +1,3 @@
+Tests: root-integration
+Restrictions: needs-root, isolation-machine
+Depends: @, bash, iproute2, iptables, iputils-ping, jq

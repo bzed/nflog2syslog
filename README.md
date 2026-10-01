@@ -1,0 +1,81 @@
+# nflog2syslog
+
+Reads packets from the Linux kernel's NFLOG target (netfilter) over a
+netlink socket, dissects them, and forwards one JSON object per packet to
+syslog. Clean-room Rust rewrite of `nflog-to-syslog`; output is structured
+JSON instead of the old `key=value` line format.
+
+Licensed under Apache-2.0. See `PLAN.md` for the design and rationale.
+
+## How it works
+
+```
+netlink recv thread -> [bounded queue] -> dissect/format worker
+                                           -> [bounded queue] -> syslog sink
+```
+
+- Every queue is bounded and fed with `try_send`: a stalled syslog server
+  causes counted, reported drops — never a stalled kernel socket (the root
+  cause of the old tool's `ENOBUFS`/lost-log problems).
+- The netlink socket is enlarged with `SO_RCVBUFFORCE` (8 MiB default),
+  falling back to `SO_RCVBUF` without `CAP_NET_ADMIN`.
+- Dissection is done by the [packet-dissector](https://crates.io/crates/packet-dissector)
+  framework (Ethernet/ARP/VLAN, IPv4/IPv6, TCP/UDP, ICMP/ICMPv6, GRE, ESP,
+  AH, DNS/mDNS/LLMNR, NTP, DHCP(v6), SNMP, VXLAN, L2TP and more; coverage
+  follows the enabled cargo features).
+- Statistics (processed, queue drops, kernel drops, sink errors) are
+  reported on stderr every `--stats-interval` seconds when nonzero.
+
+## Output
+
+One JSON object per logged packet:
+
+```json
+{"prefix":"fw-drop","timestamp":"2026-09-30T12:34:56.789012Z",
+ "in_dev":"eth0","out_dev":null,"phys_in_dev":null,"phys_out_dev":null,
+ "hook":"forward","hw_type":"ETHER","hw_protocol":"IP","hw_addr":null,
+ "uid":null,"gid":null,"mark":null,"seq":null,"seq_global":null,
+ "layers":{"IPv4":{"src":"10.0.0.1","dst":"10.0.0.2","protocol":"TCP"},
+           "TCP":{"src_port":443,"dst_port":51000}}}
+```
+
+`layers` contains one object per protocol layer found; undissectable
+payloads produce `{"layers":{"error":"..."}}` instead of a panic.
+
+## Usage
+
+```
+nflog2syslog [--nflog-group N] [--dest ip:port] [--proto udp|tcp]
+             [--copy-range N] [--rcvbuf BYTES] [--queue-size N]
+             [--stdout] [--local-syslog] [--stats-interval SECS]
+```
+
+- `--dest` empty (or omitted) sends to the local syslog socket; use
+  `--proto` to send to a remote server via UDP or TCP.
+- `--stdout` copies every JSON line to stdout (useful for testing and for
+  journald under systemd), `--local-syslog` to the local socket as well.
+- Matching firewall rule: `iptables -A FORWARD -j NFLOG --nflog-group 5`
+  with `--nflog-group 5`.
+
+Requires `CAP_NET_ADMIN` (the NFLOG bind needs it anyway; it also enables
+the `SO_RCVBUFFORCE` path).
+
+## Building
+
+```
+cargo build --release
+cargo test            # unit + golden tests
+cargo clippy --all-targets
+```
+
+Rust >= 1.85 (packet-dissector 0.6 requirement).
+
+## Debian packaging
+
+```
+make vendor           # vendor crates for an offline package build
+dpkg-buildpackage -us -uc -b
+```
+
+See `debian/` and `TESTING.md` for the full test checklist, including the
+root-only end-to-end test (`scripts/root-integration-test.sh`).

@@ -45,10 +45,8 @@ impl Sinks {
         };
         if let Some(dest) = &cfg.dest {
             let logger = match cfg.proto.as_deref() {
-                Some("udp") => {
-                    syslog::udp(formatter(), ("0.0.0.0", 0), (dest.as_str(), 0))
-                        .map_err(|e| format!("udp syslog to {dest}: {e}"))?
-                }
+                Some("udp") => syslog::udp(formatter(), ("0.0.0.0", 0), (dest.as_str(), 0))
+                    .map_err(|e| format!("udp syslog to {dest}: {e}"))?,
                 Some("tcp") => syslog::tcp(formatter(), dest.as_str())
                     .map_err(|e| format!("tcp syslog to {dest}: {e}"))?,
                 _ => syslog::unix(formatter()).map_err(|e| format!("local syslog: {e}"))?,
@@ -56,9 +54,8 @@ impl Sinks {
             sinks.remote = Some(logger);
         }
         if cfg.local_syslog {
-            sinks.local = Some(
-                syslog::unix(formatter()).map_err(|e| format!("local syslog: {e}"))?,
-            );
+            sinks.local =
+                Some(syslog::unix(formatter()).map_err(|e| format!("local syslog: {e}"))?);
         }
         Ok(sinks)
     }

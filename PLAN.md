@@ -2,9 +2,10 @@
 
 Implementation plan and benefit analysis.
 
-Status: phases 1–5 implemented (initial commit), verified by unit tests,
-clippy, and a live kernel handshake check. Phases 6–8 (root integration
-test, packaging, license decision) are open — see §8.
+Status: phases 1–5 implemented and verified; phases 6–8 implemented
+(integration test script, Debian packaging, Apache-2.0 license) —
+the root-only end-to-end run is still pending (needs a root shell),
+see §8 and TESTING.md.
 
 ## 1. Benefit analysis
 
@@ -36,9 +37,8 @@ Estimated own code: ~700–900 lines Rust vs ~1600 lines Go.
   FFI to libnetfilter_log. Keeps the binary free of GPL and C runtime deps.
 - **Output**: structured JSON per packet (one JSON object per syslog message).
   New format — downstream parsers of the old `k=v` format must be adapted once.
-- **License**: deferred until the crate set is final. Every selected crate is
-  MIT or Apache-2.0 (dual), so MIT, Apache-2.0, BSD or GPL all remain possible.
-  Pick after the dependency list is frozen (see §3) and record in LICENSE.
+- **License**: Apache-2.0 (LICENSE file, Cargo.toml, debian/copyright).
+  Every dependency is MIT OR Apache-2.0 (dual), so the combination is clean.
 - **Project**: standalone repo `nflog2syslog`, clean-room (implemented from
   kernel uapi headers, RFCs, and crate APIs — not translated from the Go code).
 
@@ -201,13 +201,18 @@ Semantics follow the old tool where names match (`--nflog-group` default 0,
    follow-up test vectors)
 5. **Syslog sinks**: local, UDP, TCP; local-output mode. — **done**
    (`src/sinks.rs`)
-6. **Integration test**: root-only (`cargo test --ignored`):
-   `unshare -n` + iptables NFLOG rule + crafted packets, assert JSON lines.
-   — **open** (needs root; exercises the full packet path for the first time)
-7. **Packaging**: systemd unit, Debian packaging (dh-cargo + vendored crates),
-   release binaries (musl static). — **open**
-8. **License decision**: freeze deps, pick license, add LICENSE + headers.
-   — **open** (all current deps are MIT OR Apache-2.0)
+6. **Integration test**: root-only end-to-end test — **implemented**
+   (`scripts/root-integration-test.sh`: `unshare --net`, NFLOG rule with
+   prefix, ping traffic, SIGTERM shutdown, jq assertions on prefix/ICMP/
+   IPv4 layers; DEP-8 wrapper in `debian/tests/`). **Not yet executed —
+   needs a root shell**; run `sudo make integration-test` (see TESTING.md §4).
+7. **Packaging** — **done and verified** (systemd unit with hardening +
+   `nfl2sl` system user, `/etc/default` config, plain debhelper+cargo rules
+   with vendored offline builds, man page, DEP-8 autopkgtest, `.gitlab-ci.yml`
+   with salsa-ci). Verified: `make vendor && dpkg-buildpackage -us -uc -b`
+   builds, runs the full test suite during build, lintian-clean except the
+   standard first-upload notice, packaged binary runs.
+8. **License decision** — **done**: Apache-2.0.
 
 ## 8a. Implementation findings (worth keeping in mind)
 
@@ -232,5 +237,5 @@ Semantics follow the old tool where names match (`--nflog-group` default 0,
 | All crates are 0.x (API churn) | Pin exact versions (`=x.y.z`), commits to Cargo.lock, review on major bumps of packet-dissector (very active upstream — good and bad). |
 | packet-dissector is young | Feature-gate to the ~20 protocols we need; own JSON layer is isolated behind one module, swap to etherparse/pnet fallback is possible without touching the pipeline. |
 | Wire-protocol bugs (bind/config) | Phase 2 byte-fixture tests + phase 6 real-kernel integration test. |
-| Debian builds need network | Vendor crates (`cargo vendor`) in orig tarball, as done for the Go tool previously. |
+| Debian builds need network | `make vendor` snapshots all crates (plus a workaround for a cargo vendor checksum bug) so builds run offline; CI sbuild alternatively uses `--enable-network`. |
 | JSON output churn | Golden tests fix the schema; schema documented in README. |

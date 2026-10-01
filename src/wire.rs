@@ -6,8 +6,8 @@
 //! packet attributes the kernel sends for logged packets.
 
 use netlink_packet_core::{
-    DecodeError, NetlinkHeader, NetlinkMessage, NetlinkSerializable, NLA_ALIGNTO,
-    NlasIterator, NLMSG_ERROR, NLM_F_ACK, NLM_F_REQUEST,
+    DecodeError, NetlinkHeader, NetlinkMessage, NetlinkSerializable, NlasIterator, NLA_ALIGNTO,
+    NLMSG_ERROR, NLM_F_ACK, NLM_F_REQUEST,
 };
 use std::fmt;
 use std::ops::Range;
@@ -80,7 +80,10 @@ impl From<DecodeError> for WireError {
 pub enum ConfigAttr {
     Cmd(u8),
     /// struct nfulnl_msg_config_mode: { be32 copy_range; u8 copy_mode; u8 pad }
-    Mode { copy_range: u32, copy_mode: u8 },
+    Mode {
+        copy_range: u32,
+        copy_mode: u8,
+    },
 }
 
 impl ConfigAttr {
@@ -330,7 +333,9 @@ impl netlink_packet_core::NetlinkDeserializable for NflogPacket {
 }
 
 /// NLMSG_ERROR ack for a config request: Ok(()) on ACK, Err on NACK.
-pub fn check_ack(msg: &netlink_packet_core::NetlinkMessage<ConfigRequest>) -> Result<(), WireError> {
+pub fn check_ack(
+    msg: &netlink_packet_core::NetlinkMessage<ConfigRequest>,
+) -> Result<(), WireError> {
     if let netlink_packet_core::NetlinkPayload::Error(err) = &msg.payload {
         match err.code {
             None => Ok(()),
@@ -358,8 +363,7 @@ pub fn message_ranges(data: &[u8]) -> Vec<Range<usize>> {
     let mut ranges = Vec::new();
     let mut off = 0;
     while off + 16 <= data.len() {
-        let len =
-            u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        let len = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
         if len < 16 || off + len > data.len() {
             break;
         }

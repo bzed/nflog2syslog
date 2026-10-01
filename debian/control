@@ -1,0 +1,24 @@
+Source: nflog2syslog
+Section: net
+Priority: optional
+Maintainer: Bernd Zeimetz <bzed@debian.org>
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+ cargo:native,
+ rustc:native (>= 1.85),
+ libstd-rust-dev,
+Standards-Version: 4.7.2
+
+Package: nflog2syslog
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+ adduser,
+Description: NFLOG to JSON-to-syslog transport daemon
+ nflog2syslog reads packets from the kernel's NFLOG netfilter target via
+ netlink, dissects them into protocol layers (IPv4/IPv6, TCP/UDP, ICMP,
+ GRE, DNS, DHCP and more), and forwards one JSON object per packet to
+ syslog (local socket, UDP or TCP). A stalled syslog server causes
+ counted drops instead of blocking the kernel socket.

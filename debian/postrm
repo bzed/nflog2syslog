@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    purge)
+        deluser --quiet --system nfl2sl || true
+        ;;
+esac
+
+#DEBHELPER#

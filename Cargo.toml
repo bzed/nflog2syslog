@@ -3,7 +3,8 @@ name = "nflog2syslog"
 version = "0.1.0"
 edition = "2021"
 description = "Read Linux kernel NFLOG packets via netlink, dissect them, and forward them as JSON to syslog"
-license = "TBD" # ponytail: decide once the dependency set is frozen (all deps MIT OR Apache-2.0)
+license = "Apache-2.0"
+authors = ["Bernd Zeimetz <bzed@debian.org>"]
 
 [dependencies]
 libc = "0.2"

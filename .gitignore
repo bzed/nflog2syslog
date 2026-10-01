@@ -1,1 +1,11 @@
 /target
+/vendor
+/.cargo
+# Debian package build outputs
+debian/nflog2syslog/
+debian/files
+debian/debhelper-build-stamp
+debian/.debhelper/
+debian/*.log
+debian/*.substvars
+debian/*.debhelper
