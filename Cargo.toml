@@ -1,0 +1,44 @@
+[package]
+name = "nflog2syslog"
+version = "0.1.0"
+edition = "2021"
+description = "Read Linux kernel NFLOG packets via netlink, dissect them, and forward them as JSON to syslog"
+license = "TBD" # ponytail: decide once the dependency set is frozen (all deps MIT OR Apache-2.0)
+
+[dependencies]
+libc = "0.2"
+netlink-sys = "0.9"
+netlink-packet-core = "0.9"
+packet-dissector = { version = "0.6", default-features = false }
+serde_json = { version = "1", features = ["preserve_order"] }
+syslog = "7"
+time = { version = "0.3", features = ["formatting", "macros"] }
+clap = { version = "4", features = ["derive"] }
+
+[features]
+default = [
+    "packet-dissector/raw_ip",
+    "packet-dissector/arp",
+    "packet-dissector/ipv4",
+    "packet-dissector/ipv6",
+    "packet-dissector/icmp",
+    "packet-dissector/icmpv6",
+    "packet-dissector/tcp",
+    "packet-dissector/udp",
+    "packet-dissector/gre",
+    "packet-dissector/esp",
+    "packet-dissector/ah",
+    "packet-dissector/dns",
+    "packet-dissector/mdns",
+    "packet-dissector/llmnr",
+    "packet-dissector/ntp",
+    "packet-dissector/dhcp",
+    "packet-dissector/dhcpv6",
+    "packet-dissector/snmp",
+    "packet-dissector/vxlan",
+    "packet-dissector/l2tp",
+]
+
+[profile.release]
+lto = true
+strip = true
