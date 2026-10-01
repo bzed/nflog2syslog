@@ -16,6 +16,8 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends},
  adduser,
+Conflicts: nflog-to-syslog
+Replaces: nflog-to-syslog
 Description: NFLOG to JSON-to-syslog transport daemon
  nflog2syslog reads packets from the kernel's NFLOG netfilter target via
  netlink, dissects them into protocol layers (IPv4/IPv6, TCP/UDP, ICMP,

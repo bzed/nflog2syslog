@@ -148,6 +148,13 @@ Expected: `.deb` builds (vendor/ makes it offline-capable; without
 vendor/, the build host needs network to fetch crates); lintian reports
 nothing fatal for a native initial release.
 
+Note: the package `Conflicts`/`Replaces` `nflog-to-syslog` — installing it
+on a box that has the old Go tool removes that package in the same dpkg
+run (verify on the VM: `dpkg -l nflog-to-syslog` shows no ii afterwards).
+This is intentional: same NFLOG group must not be consumed twice, and the
+output format changed from `key=value` to JSON — downstream log parsers
+must be adapted before switching production hosts.
+
 Install and service test on a VM:
 
 ```bash
