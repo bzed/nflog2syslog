@@ -96,15 +96,12 @@ fn parse_packet_attributes() {
         pkt.payload.as_deref(),
         Some(&[0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe][..])
     );
-    assert_eq!(pkt.unknown_attrs, 0);
 }
 
 #[test]
-fn unknown_attributes_are_counted_not_fatal() {
+fn unknown_attributes_are_skipped_not_fatal() {
     let mut msg = packet_message();
     // append an attribute with an unknown type (99), len=5
-    let nl = (16 + 4 + msg.len() - 16) as u32; // recompute below instead
-    let _ = nl;
     let attr = [5u8, 0, 99, 0, 0xaa, 0, 0, 0];
     let old_len = u32::from_le_bytes(msg[0..4].try_into().unwrap());
     msg[0..4].copy_from_slice(&(old_len + attr.len() as u32).to_le_bytes());
@@ -114,8 +111,11 @@ fn unknown_attributes_are_counted_not_fatal() {
     let NetlinkPayload::InnerMessage(pkt) = &parsed.payload else {
         panic!("expected inner message");
     };
-    assert_eq!(pkt.unknown_attrs, 1);
     assert_eq!(pkt.prefix.as_deref(), Some("fw-drop"));
+    assert_eq!(
+        pkt.payload.as_deref(),
+        Some(&[0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe][..])
+    );
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn message_ranges_walks_datagrams() {
         datagram.push(0);
     }
     datagram.extend_from_slice(&two);
-    let ranges = message_ranges(&datagram);
+    let ranges: Vec<_> = message_ranges(&datagram).collect();
     assert_eq!(ranges.len(), 2);
     assert_eq!(ranges[0].len(), one.len());
     assert_eq!(datagram[ranges[0].clone()].to_vec(), one);
@@ -161,8 +161,7 @@ fn message_ranges_walks_datagrams() {
 
 #[test]
 fn truncated_datagram_yields_no_ranges() {
-    assert!(message_ranges(&[0u8; 8]).is_empty());
+    assert_eq!(message_ranges(&[0u8; 8]).count(), 0);
     let one = packet_message();
-    let ranges = message_ranges(&one[..one.len() - 1]);
-    assert_eq!(ranges.len(), 0);
+    assert_eq!(message_ranges(&one[..one.len() - 1]).count(), 0);
 }

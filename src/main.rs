@@ -64,7 +64,7 @@ fn main() {
             match q2.try_send(msg) {
                 Ok(()) => {}
                 Err(std::sync::mpsc::TrySendError::Full(_)) => {
-                    worker_stats.add(&worker_stats.worker_dropped, 1);
+                    worker_stats.worker_dropped.fetch_add(1, Ordering::Relaxed);
                 }
                 Err(std::sync::mpsc::TrySendError::Disconnected(_)) => break,
             }
@@ -116,17 +116,4 @@ fn main() {
     let _ = worker_handle.join();
     let _ = sink_handle.join();
     eprintln!("nflog2syslog stopped.");
-}
-
-#[cfg(test)]
-mod tests {
-    use nflog2syslog::wire::round_up;
-
-    #[test]
-    fn round_up_alignment() {
-        assert_eq!(round_up(0, 4), 0);
-        assert_eq!(round_up(1, 4), 4);
-        assert_eq!(round_up(6, 4), 8);
-        assert_eq!(round_up(8, 4), 8);
-    }
 }

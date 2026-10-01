@@ -47,8 +47,6 @@ const ATTR_SEQ: u16 = 12;
 const ATTR_SEQ_GLOBAL: u16 = 13;
 const ATTR_GID: u16 = 14;
 const ATTR_HWTYPE: u16 = 15;
-const ATTR_HWHEADER: u16 = 16;
-const ATTR_HWLEN: u16 = 17;
 
 pub fn config_msg_type() -> u16 {
     (NFNL_SUBSYS_ULOG << 8) | NFULNL_MSG_CONFIG
@@ -195,7 +193,7 @@ impl NetlinkSerializable for ConfigRequest {
         4 + self
             .attrs
             .iter()
-            .map(|a| 4 + round_up(a.payload_bytes().len(), NLA_ALIGNTO))
+            .map(|a| 4 + a.payload_bytes().len().div_ceil(NLA_ALIGNTO) * NLA_ALIGNTO)
             .sum::<usize>()
     }
 
@@ -211,7 +209,7 @@ impl NetlinkSerializable for ConfigRequest {
             buffer[off..off + 2].copy_from_slice(&(len as u16).to_le_bytes());
             buffer[off + 2..off + 4].copy_from_slice(&attr.attr_type().to_le_bytes());
             buffer[off + 4..off + 4 + payload.len()].copy_from_slice(&payload);
-            let padded = 4 + round_up(payload.len(), NLA_ALIGNTO);
+            let padded = 4 + payload.len().div_ceil(NLA_ALIGNTO) * NLA_ALIGNTO;
             for b in &mut buffer[off + 4 + payload.len()..off + padded] {
                 *b = 0;
             }
@@ -239,10 +237,6 @@ pub struct NflogPacket {
     pub seq: Option<u32>,
     pub seq_global: Option<u32>,
     pub hw_type: Option<u16>,
-    pub hw_header: Option<Vec<u8>>,
-    pub hw_len: Option<u16>,
-    /// Attribute types seen that we do not parse (counted by the caller).
-    pub unknown_attrs: u32,
 }
 
 impl netlink_packet_core::NetlinkDeserializable for NflogPacket {
@@ -317,15 +311,10 @@ impl netlink_packet_core::NetlinkDeserializable for NflogPacket {
                 ATTR_HWTYPE if value.len() >= 2 => {
                     pkt.hw_type = Some(u16::from_be_bytes([value[0], value[1]]));
                 }
-                ATTR_HWHEADER => {
-                    pkt.hw_header = Some(value.to_vec());
-                }
-                ATTR_HWLEN if value.len() >= 2 => {
-                    pkt.hw_len = Some(u16::from_be_bytes([value[0], value[1]]));
-                }
-                _ => {
-                    pkt.unknown_attrs += 1;
-                }
+                // unknown attributes are skipped, never fatal: the kernel
+                // adds attributes (e.g. NFULA_VLAN, NFULA_L2HDR) newer tools
+                // may know but this one does not need
+                _ => {}
             }
         }
         Ok(pkt)
@@ -353,22 +342,20 @@ pub fn check_ack(
     }
 }
 
-pub fn round_up(len: usize, align: usize) -> usize {
-    (len + align - 1) & !(align - 1)
-}
-
 /// Split a received datagram into individual netlink messages by walking
-/// nlmsg_len fields. Returns byte ranges, one per message.
-pub fn message_ranges(data: &[u8]) -> Vec<Range<usize>> {
-    let mut ranges = Vec::new();
-    let mut off = 0;
-    while off + 16 <= data.len() {
+/// nlmsg_len fields. Yields one byte range per message, no allocation.
+pub fn message_ranges(data: &[u8]) -> impl Iterator<Item = Range<usize>> + '_ {
+    let mut off = 0usize;
+    std::iter::from_fn(move || {
+        if off + 16 > data.len() {
+            return None;
+        }
         let len = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
         if len < 16 || off + len > data.len() {
-            break;
+            return None;
         }
-        ranges.push(off..off + len);
-        off += round_up(len, 4);
-    }
-    ranges
+        let range = off..off + len;
+        off += len.div_ceil(NLA_ALIGNTO) * NLA_ALIGNTO;
+        Some(range)
+    })
 }

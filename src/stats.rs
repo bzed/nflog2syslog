@@ -2,7 +2,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(Default)]
 pub struct Stats {
@@ -12,7 +12,7 @@ pub struct Stats {
     pub worker_dropped: AtomicU64,
     /// packets the kernel dropped (ENOBUFS on the netlink socket)
     pub kernel_dropped: AtomicU64,
-    /// packets successfully handed to a syslog sink
+    /// packets successfully handed to a sink
     pub processed: AtomicU64,
     /// syslog write errors
     pub sink_errors: AtomicU64,
@@ -21,17 +21,12 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn add(&self, counter: &AtomicU64, n: u64) {
-        counter.fetch_add(n, Ordering::Relaxed);
-    }
-
     fn get(&self, counter: &AtomicU64) -> u64 {
         counter.load(Ordering::Relaxed)
     }
 
-    /// Report all nonzero counters to stderr. Returns true if anything was
-    /// reported.
-    pub fn report(&self) -> bool {
+    /// Report all nonzero counters to stderr.
+    pub fn report(&self) {
         let recv = self.get(&self.recv_dropped);
         let worker = self.get(&self.worker_dropped);
         let kernel = self.get(&self.kernel_dropped);
@@ -39,31 +34,32 @@ impl Stats {
         let sink_errors = self.get(&self.sink_errors);
         let parse_errors = self.get(&self.parse_errors);
         if recv == 0 && worker == 0 && kernel == 0 && sink_errors == 0 && parse_errors == 0 {
-            return false;
+            return;
         }
         eprintln!(
             "stats: processed={processed} dropped(queue_recv)={recv} \
 dropped(queue_sink)={worker} dropped(kernel)={kernel} sink_errors={sink_errors} \
 parse_errors={parse_errors}"
         );
-        true
     }
 }
 
 /// Run until `shutdown` becomes true, reporting `stats` every `interval`.
-/// Used by the main thread.
+/// Used by the main thread. Sleeps in one-second steps so shutdown is
+/// noticed promptly (the recv thread's poll(1000) dominates exit latency
+/// anyway).
 pub fn report_loop(stats: Arc<Stats>, interval: Duration, shutdown: &AtomicBool) {
-    let mut next = Instant::now() + interval;
+    // a disabled interval (u64::MAX/2) still gives a functioning loop that
+    // only checks the shutdown flag
+    let ticks = interval.as_secs().max(1);
     loop {
-        if shutdown.load(Ordering::Relaxed) {
-            let _ = stats.report();
-            return;
+        for _ in 0..ticks {
+            if shutdown.load(Ordering::Relaxed) {
+                stats.report();
+                return;
+            }
+            std::thread::sleep(Duration::from_secs(1));
         }
-        let now = Instant::now();
-        if now >= next {
-            stats.report();
-            next = now + interval;
-        }
-        std::thread::sleep(Duration::from_millis(200).min(next.saturating_duration_since(now)));
+        stats.report();
     }
 }

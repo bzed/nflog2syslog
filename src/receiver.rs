@@ -17,11 +17,6 @@ pub struct ReceiverConfig {
     pub rcvbuf: usize,
 }
 
-/// One in-flight config request awaiting its ACK.
-struct Pending {
-    seq: u32,
-}
-
 pub struct Receiver {
     socket: Socket,
     next_seq: u32,
@@ -74,7 +69,6 @@ impl Receiver {
             .send(&buf, 0)
             .map_err(|e| format!("netlink send: {e}"))?;
 
-        let pending = Pending { seq };
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         // netlink_sys::Socket::recv expects a bytes::BufMut: it writes into
         // the spare capacity past len, so the buffer must start empty.
@@ -86,7 +80,7 @@ impl Receiver {
             buf.clear();
             if let Err(e) = self.socket.recv(&mut buf, 0) {
                 if e.raw_os_error() == Some(libc::ENOBUFS) {
-                    self.stats.add(&self.stats.kernel_dropped, 1);
+                    self.stats.kernel_dropped.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
                 return Err(format!("netlink recv: {e}"));
@@ -95,7 +89,7 @@ impl Receiver {
                 let Ok(msg) = NetlinkMessage::<ConfigRequest>::deserialize(&buf[range]) else {
                     continue;
                 };
-                if msg.header.sequence_number != pending.seq {
+                if msg.header.sequence_number != seq {
                     continue;
                 }
                 return wire::check_ack(&msg).map_err(|e| e.to_string());
@@ -132,23 +126,23 @@ impl Receiver {
                 if e.raw_os_error() == Some(libc::ENOBUFS) {
                     // kernel dropped queued packets; the count is
                     // per-overflow-event, not per-packet
-                    self.stats.add(&self.stats.kernel_dropped, 1);
+                    self.stats.kernel_dropped.fetch_add(1, Ordering::Relaxed);
                 } else {
-                    self.stats.add(&self.stats.parse_errors, 1);
+                    self.stats.parse_errors.fetch_add(1, Ordering::Relaxed);
                     eprintln!("netlink recv error: {e}");
                 }
                 continue;
             }
             for range in wire::message_ranges(&buf) {
                 let Ok(msg) = NetlinkMessage::<NflogPacket>::deserialize(&buf[range]) else {
-                    self.stats.add(&self.stats.parse_errors, 1);
+                    self.stats.parse_errors.fetch_add(1, Ordering::Relaxed);
                     continue;
                 };
                 match &msg.payload {
                     NetlinkPayload::InnerMessage(pkt) => match queue.try_send(pkt.clone()) {
                         Ok(()) => {}
                         Err(TrySendError::Full(_)) => {
-                            self.stats.add(&self.stats.recv_dropped, 1);
+                            self.stats.recv_dropped.fetch_add(1, Ordering::Relaxed);
                         }
                         Err(TrySendError::Disconnected(_)) => return,
                     },

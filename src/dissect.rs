@@ -2,7 +2,7 @@
 //! and build the JSON layers object for it.
 
 use packet_dissector::dissectors::arp::ArpDissector;
-use packet_dissector::field::{Field, FieldValue};
+use packet_dissector::field::FieldValue;
 pub use packet_dissector::packet::DissectBuffer;
 use packet_dissector::packet::Layer;
 use packet_dissector::registry::DissectorRegistry;
@@ -14,70 +14,49 @@ use std::sync::atomic::AtomicU64;
 const LINKTYPE_RAW: u32 = 101;
 /// Private link-type key used to enter the ARP dissector directly
 /// (NFLOG hands us the ARP header without an Ethernet header).
-const LINKTYPE_ARP: u32 = 0x0806; // ETH_P_ARP
+pub const LINKTYPE_ARP: u32 = 0x0806; // ETH_P_ARP
 
 /// Build the dissector registry with the protocols enabled via cargo
 /// features, plus a custom entry for ARP payloads.
-pub fn build_registry() -> DissectorRegistry {
+pub(crate) fn build_registry() -> DissectorRegistry {
     let mut registry = DissectorRegistry::default();
     registry.register_by_link_type_or_replace(LINKTYPE_ARP, Box::new(ArpDissector));
     registry
 }
 
-pub struct Dissector {
-    registry: DissectorRegistry,
-}
-
-impl Dissector {
-    pub fn new() -> Dissector {
-        Dissector {
-            registry: build_registry(),
-        }
-    }
-
-    /// Dissect `payload` and return the "layers" JSON object with one entry
-    /// per protocol layer. A None payload yields Null; a payload that cannot
-    /// be dissected yields `{"error": ...}` and bumps the parse-error counter.
-    pub fn dissect_into<'pkt>(
-        &self,
-        payload: Option<&'pkt [u8]>,
-        hw_protocol: Option<u16>,
-        buf: &mut DissectBuffer<'pkt>,
-        parse_errors: &AtomicU64,
-    ) -> Value {
-        let Some(payload) = payload else {
-            return Value::Null;
-        };
-        let link_type = match hw_protocol {
-            // ETH_P_IP / ETH_P_IPV6
-            Some(0x0800) | Some(0x86dd) => LINKTYPE_RAW,
-            // ETH_P_ARP: payload starts at the ARP header
-            Some(0x0806) => LINKTYPE_ARP,
-            _ => LINKTYPE_RAW,
-        };
-        let mut layers = Map::new();
-        match self
-            .registry
-            .dissect_with_link_type(payload, link_type, buf)
-        {
-            Ok(()) => {
-                for layer in buf.layers() {
-                    layers.insert(layer.name.to_string(), layer_to_json(buf, layer));
-                }
-            }
-            Err(e) => {
-                parse_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                layers.insert("error".into(), Value::String(e.to_string()));
+/// Dissect `payload` and return the "layers" JSON object with one entry
+/// per protocol layer. A None payload yields Null; a payload that cannot
+/// be dissected yields `{"error": ...}` and bumps the parse-error counter.
+pub(crate) fn dissect_into<'pkt>(
+    registry: &DissectorRegistry,
+    payload: Option<&'pkt [u8]>,
+    hw_protocol: Option<u16>,
+    buf: &mut DissectBuffer<'pkt>,
+    parse_errors: &AtomicU64,
+) -> Value {
+    let Some(payload) = payload else {
+        return Value::Null;
+    };
+    let link_type = match hw_protocol {
+        // ETH_P_IP / ETH_P_IPV6
+        Some(0x0800) | Some(0x86dd) => LINKTYPE_RAW,
+        // ETH_P_ARP: payload starts at the ARP header
+        Some(0x0806) => LINKTYPE_ARP,
+        _ => LINKTYPE_RAW,
+    };
+    let mut layers = Map::new();
+    match registry.dissect_with_link_type(payload, link_type, buf) {
+        Ok(()) => {
+            for layer in buf.layers() {
+                layers.insert(layer.name.to_string(), layer_to_json(buf, layer));
             }
         }
-        Value::Object(layers)
+        Err(e) => {
+            parse_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            layers.insert("error".into(), Value::String(e.to_string()));
+        }
     }
-}
-
-impl Default for Dissector {
-    fn default() -> Self {
-        Dissector::new()
-    }
+    Value::Object(layers)
 }
 
 fn layer_to_json(buf: &DissectBuffer, layer: &Layer) -> Value {
@@ -87,13 +66,12 @@ fn layer_to_json(buf: &DissectBuffer, layer: &Layer) -> Value {
         let Some(field) = fields.get(idx as usize) else {
             continue;
         };
-        obj.insert(field.descriptor.name.to_string(), field_to_json(buf, field));
+        obj.insert(
+            field.descriptor.name.to_string(),
+            field_value_to_json(buf, &field.value),
+        );
     }
     Value::Object(obj)
-}
-
-fn field_to_json(buf: &DissectBuffer, field: &Field) -> Value {
-    field_value_to_json(buf, &field.value)
 }
 
 fn field_value_to_json(buf: &DissectBuffer, value: &FieldValue) -> Value {

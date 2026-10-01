@@ -2,8 +2,9 @@
 //! nflog metadata (prefix, interfaces, uid/gid, ...) plus the
 //! dissected protocol layers.
 
-use crate::dissect::{DissectBuffer, Dissector};
+use crate::dissect::{build_registry, dissect_into, DissectBuffer};
 use crate::wire::NflogPacket;
+use packet_dissector::registry::DissectorRegistry;
 use serde_json::{Map, Value};
 use std::ffi::CStr;
 use std::sync::atomic::AtomicU64;
@@ -11,7 +12,7 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 pub struct Formatter {
-    dissector: Dissector,
+    registry: DissectorRegistry,
     buf: DissectBuffer<'static>,
 }
 
@@ -20,7 +21,7 @@ impl Formatter {
         // The buffer is cleared between packets and only borrows the packet
         // payload during dissection, so it can be reused indefinitely.
         Formatter {
-            dissector: Dissector::new(),
+            registry: build_registry(),
             buf: DissectBuffer::new(),
         }
     }
@@ -64,17 +65,10 @@ impl Formatter {
         let layers = {
             let payload = pkt.payload.as_deref();
             let buf = self.buf.clear_into();
-            self.dissector
-                .dissect_into(payload, pkt.hw_protocol, buf, parse_errors)
+            dissect_into(&self.registry, payload, pkt.hw_protocol, buf, parse_errors)
         };
         root.insert("layers".into(), layers);
         Value::Object(root).to_string()
-    }
-}
-
-impl Default for Formatter {
-    fn default() -> Self {
-        Formatter::new()
     }
 }
 
@@ -176,5 +170,11 @@ fn hw_protocol_name(hw_protocol: u16) -> String {
         libc::ETH_P_MPLS_UC => "MPLS_UC".to_string(),
         libc::ETH_P_MPLS_MC => "MPLS_MC".to_string(),
         _ => format!("<ether-type={hw_protocol:#06x}>"),
+    }
+}
+
+impl Default for Formatter {
+    fn default() -> Self {
+        Formatter::new()
     }
 }
