@@ -56,12 +56,16 @@ unshare --net bash -euo pipefail -c "
     iptables -A INPUT -i lo -p icmp -j NFLOG --nflog-group \$GROUP \
         --nflog-prefix "test-integration" \
         || { echo 'FAIL: could not install NFLOG rule (kernel module missing?)'; exit 1; }
-    \$BIN --nflog-group \$GROUP --stdout --stats-interval 1 > \"\$OUT\" 2>/tmp/nflog2syslog-test.err &
+    \$BIN --nflog-group \$GROUP --stats-interval 1 > \"\$OUT\" 2>/tmp/nflog2syslog-test.err &
     DAEMON=\$!
     sleep 1
+    # fail loudly (with the daemon's stderr) if it exited early
+    if ! kill -0 \$DAEMON 2>/dev/null; then
+        echo 'FAIL: daemon exited early'; exit 1
+    fi
     ping -c 3 -W 1 127.0.0.1 >/dev/null
     sleep 1
-    kill -TERM \$DAEMON
+    kill -TERM \$DAEMON 2>/dev/null || true
     wait \$DAEMON || true
 " || { echo "FAIL: namespace test run failed"; cat /tmp/nflog2syslog-test.err; exit 1; }
 

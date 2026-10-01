@@ -48,7 +48,7 @@ Proves: wire protocol fidelity and JSON schema stability.
 ## 3. Unprivileged smoke test (no root)
 
 ```bash
-./target/release/nflog2syslog --nflog-group 7 --stdout; echo "exit: $?"
+./target/release/nflog2syslog --nflog-group 7; echo "exit: $?"
 ```
 
 Expected (as non-root):
