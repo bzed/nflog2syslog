@@ -172,13 +172,16 @@ Rules:
 
 ```
 nflog2syslog [--nflog-group N] [--dest ip:port] [--proto udp|tcp]
-             [--rcvbuf BYTES] [--queue-size N] [--enable-local-output]
-             [--local-output-to-syslog] [--stats-interval SECS]
+             [--stdout true|false] [--copy-range N] [--rcvbuf BYTES]
+             [--queue-size N] [--stats-interval SECS]
 ```
 
-Semantics follow the old tool where names match (`--nflog-group` default 0,
-`--dest` empty → local syslog socket, `--proto none` → no remote sink);
-`--rcvbuf`, `--queue-size`, `--stats-interval` are new knobs for the pipeline.
+Two sinks only: JSON lines on stdout (default, disable with
+`--stdout=false`) and an optional remote syslog server (`--dest`,
+UDP default / `--proto tcp`). The daemon fails to start when both are
+absent, so misconfiguration is caught at boot instead of silently
+dropping packets. `--copy-range`, `--rcvbuf`, `--queue-size`,
+`--stats-interval` are pipeline knobs.
 
 ## 8. Phases
 

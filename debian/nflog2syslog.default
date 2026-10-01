@@ -1,11 +1,15 @@
 # nflog2syslog configuration, read by the systemd unit
 # (/etc/systemd/system/nflog2syslog.service.d/*.conf can override).
 
-# Remote syslog destination, ip:port. Empty: send to the local syslog socket.
+# Remote syslog destination, ip:port. Empty: no remote syslog sink.
 DEST=""
 
-# Protocol for the remote syslog server: udp or tcp. Ignored when DEST is empty.
-PROTO=""
+# Protocol for the remote syslog server: udp or tcp.
+PROTO="udp"
+
+# Log JSON messages to stdout (-> journald under systemd): true or false.
+# The daemon fails to start if this is false while DEST is empty.
+LOG_STDOUT="true"
 
 # NFLOG group to listen on. Must match the --nflog-group of your iptables rules.
 NFLOG_GROUP="0"

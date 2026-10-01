@@ -80,7 +80,7 @@ host is touched):
 
 1. brings up `lo`, installs `iptables -A INPUT -i lo -p icmp -j NFLOG
    --nflog-group 42 --nflog-prefix "test-integration"`
-2. runs `nflog2syslog --nflog-group 42 --stdout` on that group
+2. runs `nflog2syslog --nflog-group 42` on that group (stdout is the default sink)
 3. generates traffic with `ping -c 3 127.0.0.1`
 4. SIGTERMs the daemon (exercises graceful shutdown + group unbind)
 5. asserts with `jq` that JSON lines with `prefix=="test-integration"`,
@@ -99,7 +99,7 @@ a) Live traffic to stdout:
 
 ```bash
 iptables -A INPUT -p udp --dport 53 -j NFLOG --nflog-group 5 --nflog-prefix "dns-watch"
-./target/release/nflog2syslog --nflog-group 5 --stdout --stats-interval 5
+./target/release/nflog2syslog --nflog-group 5 --stats-interval 5
 # in another shell: dig @8.8.8.8 example.com
 ```
 
@@ -115,12 +115,21 @@ b) Remote syslog sink:
 
 ```bash
 # listener: nc -ul 5514   (or syslog-ng/rsyslog)
-./target/release/nflog2syslog --dest 127.0.0.1:5514 --proto udp --nflog-group 5 --stdout
+./target/release/nflog2syslog --dest 127.0.0.1:5514 --nflog-group 5
 ```
 
 Expected: same JSON lines wrapped in RFC3164 framing (`<PRI>Mmm dd
-HH:MM:SS nflog2syslog[PID]: {...}`) arrive at the listener. Repeat with
-`--proto tcp`.
+HH:MM:SS nflog2syslog[PID]: {...}`) arrive at the listener (udp is the
+default protocol). Repeat with `--proto tcp`.
+
+c) No-sink guard (config check):
+
+```bash
+./target/release/nflog2syslog --stdout=false; echo "exit: $?"
+```
+
+Expected: exit code 2 and `Error: no output sink configured: ...` — the
+daemon refuses to run without anywhere to log to.
 
 c) Graceful shutdown: send SIGTERM while idle and while traffic flows.
 Expected: `nflog2syslog: unbound from group N` then `nflog2syslog stopped.`
@@ -136,7 +145,7 @@ Prove the decoupling actually bounds loss instead of stalling:
 python3 -c "import socket; s=socket.socket(); s.bind(('127.0.0.1',5514)); s.listen(1); input()"
 # generate a flood on the NFLOG group, e.g.:
 #   hping3 --flood -i u100 -S -p 443 localhost  (with a matching NFLOG rule)
-./target/release/nflog2syslog --dest 127.0.0.1:5514 --proto tcp \
+./target/release/nflog2syslog --dest 127.0.0.1:5514 --proto tcp --stdout=false \
     --nflog-group 5 --queue-size 100 --stats-interval 2
 ```
 
@@ -194,7 +203,7 @@ The regression test for the original problem:
 ```bash
 sudo sysctl net.core.rmem_max=8192   # force a tiny SO_RCVBUF fallback path
 # flood the NFLOG group harder than userspace can drain
-./target/release/nflog2syslog --nflog-group 5 --stdout --stats-interval 2
+./target/release/nflog2syslog --nflog-group 5 --stats-interval 2
 ```
 
 Expected: `dropped(kernel)=N` may grow under extreme load, is reported on

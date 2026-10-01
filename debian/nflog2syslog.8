@@ -13,10 +13,14 @@ netlink socket, dissects every logged packet into protocol layers
 forwards one JSON object per packet to syslog — the local syslog socket by
 default, or a remote server via UDP or TCP.
 .PP
-The receive path is decoupled from the syslog sink through bounded queues:
-a stalled syslog server causes counted, reported drops instead of blocking
-the kernel socket. The netlink socket buffer is enlarged with
+Messages are logged as JSON lines to stdout by default (under systemd
+they land in the journal) and, optionally, to a remote syslog server via
+UDP or TCP. The receive path is decoupled from the sinks through bounded
+queues: a stalled syslog server causes counted, reported drops instead of
+blocking the kernel socket. The netlink socket buffer is enlarged with
 SO_RCVBUFFORCE (falling back to SO_RCVBUF without CAP_NET_ADMIN).
+The daemon refuses to start when no sink is configured (stdout logging
+disabled and no remote destination given).
 .PP
 Requires the CAP_NET_ADMIN capability (the NFLOG group bind needs it
 anyway). Statistics (processed, queue drops, kernel drops, sink errors)
@@ -28,10 +32,11 @@ NFLOG group to listen on; must match the \fB\-\-nflog\-group\fR of your
 iptables/nftables rules. Default: 0.
 .TP
 .BR \-\-dest " " \fIIP:PORT\fR
-Remote syslog destination. Empty (default) sends to the local syslog socket.
+Remote syslog destination, e.g. 192.0.2.1:514. Absent (default): no remote
+sink.
 .TP
 .BR \-\-proto " " \fIudp|tcp\fR
-Transport for the remote syslog server. Ignored without \fB\-\-dest\fR.
+Transport for the remote syslog server. Default: udp.
 .TP
 .BR \-\-copy\-range " " \fIN\fR
 Maximum number of packet bytes the kernel copies per logged packet.
@@ -43,11 +48,11 @@ Netlink socket receive buffer size. Default: 8388608 (8 MiB).
 .BR \-\-queue\-size " " \fIN\fR
 Capacity of the internal pipeline queues. Default: 8192.
 .TP
-.B
-Copy every JSON message to stdout as well (useful under systemd/journald).
-.TP
-.BR \-\-local\-syslog
-Copy every JSON message to the local syslog socket as well.
+.BR \-\-stdout " " \fItrue|false\fR
+Log every JSON message to stdout. Default: true. With
+\fB\-\-stdout=false\fR only status messages (statistics, errors) are
+emitted on stderr; the daemon refuses to start if this leaves no output
+sink configured.
 .TP
 .BR \-\-stats\-interval " " \fISECONDS\fR
 Seconds between stderr statistics reports; 0 disables. Default: 10.

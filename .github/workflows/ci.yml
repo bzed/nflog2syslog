@@ -44,7 +44,7 @@ jobs:
       - name: expect a clean EPERM failure (exit 1)
         run: |
           set +e
-          out=$(./target/release/nflog2syslog --nflog-group 7 --stdout 2>&1)
+          out=$(./target/release/nflog2syslog --nflog-group 7 2>&1)
           rc=$?
           set -e
           echo "$out"

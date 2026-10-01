@@ -30,6 +30,10 @@ fn install_signal_handlers() {
 
 fn main() {
     let cli = Cli::parse();
+    if let Err(e) = cli.validate() {
+        eprintln!("Error: {e}");
+        std::process::exit(2);
+    }
 
     let stats = Arc::new(Stats::default());
     let (q1, rx1) = sync_channel(cli.queue_size.max(1));
@@ -37,13 +41,14 @@ fn main() {
 
     // sink thread
     let sink_cfg = SinkConfig {
-        dest: match cli.dest.as_deref() {
-            None | Some("none") => None,
-            Some(d) => Some(d.to_string()),
-        },
-        proto: cli.proto.clone().filter(|p| !p.is_empty()),
+        // an empty --dest counts as unconfigured (systemd units expand
+        // empty variables, so we treat "" like absent)
+        remote: cli
+            .dest
+            .clone()
+            .filter(|d| !d.is_empty())
+            .map(|d| (cli.proto.clone(), d)),
         stdout: cli.stdout,
-        local_syslog: cli.local_syslog,
     };
     let sink_stats = Arc::clone(&stats);
     let sink_handle = std::thread::spawn(move || {

@@ -46,14 +46,17 @@ payloads produce `{"layers":{"error":"..."}}` instead of a panic.
 
 ```
 nflog2syslog [--nflog-group N] [--dest ip:port] [--proto udp|tcp]
-             [--copy-range N] [--rcvbuf BYTES] [--queue-size N]
-             [--stdout] [--local-syslog] [--stats-interval SECS]
+             [--stdout true|false] [--copy-range N] [--rcvbuf BYTES]
+             [--queue-size N] [--stats-interval SECS]
 ```
 
-- `--dest` empty (or omitted) sends to the local syslog socket; use
-  `--proto` to send to a remote server via UDP or TCP.
-- `--stdout` copies every JSON line to stdout (useful for testing and for
-  journald under systemd), `--local-syslog` to the local socket as well.
+- JSON messages are logged to stdout by default (under systemd they land
+  in the journal); `--stdout=false` disables that, leaving only status
+  messages on stderr.
+- `--dest` sets an optional remote syslog server (UDP by default, `--proto`
+  to switch to TCP); no `--dest` means no remote sink.
+- The daemon refuses to start when no sink is configured: stdout logging
+  disabled and no `--dest` given.
 - Matching firewall rule: `iptables -A FORWARD -j NFLOG --nflog-group 5`
   with `--nflog-group 5`.
 

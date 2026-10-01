@@ -1,6 +1,6 @@
-//! Syslog output sinks. A single sink thread owns all writers so a
-//! stalled collector never blocks the dissection worker — it fills the
-//! bounded queue, which drops with accounting instead.
+//! Output sinks. A single sink thread owns the (optional) remote syslog
+//! writer so a stalled collector never blocks the dissection worker —
+//! it fills the bounded queue, which drops with accounting instead.
 
 use crate::stats::Stats;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -20,19 +20,14 @@ fn formatter() -> Formatter3164 {
 /// The sink configuration derived from CLI flags.
 #[derive(Debug, Default, Clone)]
 pub struct SinkConfig {
-    /// ip:port of the remote syslog server
-    pub dest: Option<String>,
-    /// udp / tcp; None means local syslog socket
-    pub proto: Option<String>,
-    /// copy every message to stdout as well
+    /// remote syslog server: (protocol, ip:port)
+    pub remote: Option<(String, String)>,
+    /// log JSON messages to stdout
     pub stdout: bool,
-    /// copy every message to the local syslog socket as well
-    pub local_syslog: bool,
 }
 
 pub struct Sinks {
     remote: Option<Logger<LoggerBackend, Formatter3164>>,
-    local: Option<Logger<LoggerBackend, Formatter3164>>,
     stdout: bool,
 }
 
@@ -40,22 +35,17 @@ impl Sinks {
     pub fn open(cfg: &SinkConfig) -> Result<Sinks, String> {
         let mut sinks = Sinks {
             remote: None,
-            local: None,
             stdout: cfg.stdout,
         };
-        if let Some(dest) = &cfg.dest {
-            let logger = match cfg.proto.as_deref() {
-                Some("udp") => syslog::udp(formatter(), ("0.0.0.0", 0), (dest.as_str(), 0))
+        if let Some((proto, dest)) = &cfg.remote {
+            let logger = match proto.as_str() {
+                "udp" => syslog::udp(formatter(), ("0.0.0.0", 0), (dest.as_str(), 0))
                     .map_err(|e| format!("udp syslog to {dest}: {e}"))?,
-                Some("tcp") => syslog::tcp(formatter(), dest.as_str())
+                // validated by Cli::validate()
+                _ => syslog::tcp(formatter(), dest.as_str())
                     .map_err(|e| format!("tcp syslog to {dest}: {e}"))?,
-                _ => syslog::unix(formatter()).map_err(|e| format!("local syslog: {e}"))?,
             };
             sinks.remote = Some(logger);
-        }
-        if cfg.local_syslog {
-            sinks.local =
-                Some(syslog::unix(formatter()).map_err(|e| format!("local syslog: {e}"))?);
         }
         Ok(sinks)
     }
@@ -66,12 +56,6 @@ impl Sinks {
     pub fn send(&mut self, msg: &str, stats: &Stats) {
         if self.stdout {
             println!("{msg}");
-        }
-        if let Some(logger) = self.local.as_mut() {
-            if let Err(e) = logger.info(msg) {
-                stats.add(&stats.sink_errors, 1);
-                eprintln!("local syslog write failed: {e}");
-            }
         }
         if let Some(logger) = self.remote.as_mut() {
             if let Err(e) = logger.info(msg) {
