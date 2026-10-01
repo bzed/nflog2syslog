@@ -4,12 +4,12 @@ Source: https://gitlab.conova.net/lots/tools/nflog2syslog
 
 Files: *
 Copyright:
- 2026 Bernd Zeimetz <bzed@debian.org>
+ 2026 Bernd Zeimetz <bernd@bzed.de>
 License: Apache-2.0
 
 Files: debian/*
 Copyright:
- 2026 Bernd Zeimetz <bzed@debian.org>
+ 2026 Bernd Zeimetz <bernd@bzed.de>
 License: Apache-2.0
 
 Files: vendor/*

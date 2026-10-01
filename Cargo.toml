@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Read Linux kernel NFLOG packets via netlink, dissect them, and forward them as JSON to syslog"
 license = "Apache-2.0"
-authors = ["Bernd Zeimetz <bzed@debian.org>"]
+authors = ["Bernd Zeimetz <bernd@bzed.de>"]
 
 [dependencies]
 libc = "0.2"
