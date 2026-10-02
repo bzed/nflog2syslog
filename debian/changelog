@@ -11,5 +11,9 @@ nflog2syslog (0.1.0-1) stable; urgency=medium
   * Conflicts/Replaces nflog-to-syslog: same NFLOG group must not be
     consumed by two daemons, and the output format differs — remove the
     other package on upgrade and adapt downstream log parsers.
+  * Runs as a transient systemd dynamic user (no static system user is
+    created); hardening includes an ambient CAP_NET_ADMIN bounding set,
+    restricted syscall filter and address families.
+  * Documentation and CLI help use nftables syntax (nft log group N).
 
- -- Bernd Zeimetz <bzed@debian.org>  Wed, 30 Sep 2026 12:00:00 +0200
+ -- Bernd Zeimetz <bzed@debian.org>  Fri, 02 Oct 2026 16:22:15 +0200
