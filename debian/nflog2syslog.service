@@ -3,8 +3,12 @@ Description=nflog2syslog: NFLOG to JSON syslog transport daemon
 After=network-online.target
 
 [Service]
-User=nfl2sl
-Group=nfl2sl
+# No persistent user needed: the daemon writes nothing to disk (stdout ->
+# journald, remote syslog, netlink in). DynamicUser= implies NoNewPrivileges=,
+# RestrictSUIDSGID=, PrivateTmp=, ProtectSystem=strict, ProtectHome=read-only,
+# RemoveIPC=. CAP_NET_ADMIN (ambient, only cap in the bounding set) is required
+# for the NFLOG netlink config handshake and SO_RCVBUFFORCE.
+DynamicUser=yes
 EnvironmentFile=-/etc/default/nflog2syslog
 ExecStart=/usr/sbin/nflog2syslog --dest=${DEST} --proto=${PROTO} --stdout=${LOG_STDOUT} --nflog-group=${NFLOG_GROUP} --stats-interval=${STATS_INTERVAL}
 Restart=always
@@ -13,9 +17,7 @@ AmbientCapabilities=CAP_NET_ADMIN
 CapabilityBoundingSet=CAP_NET_ADMIN
 
 LockPersonality=true
-NoNewPrivileges=true
 PrivateDevices=false
-PrivateTmp=true
 PrivateUsers=false
 ProtectClock=true
 ProtectControlGroups=true
@@ -25,11 +27,9 @@ ProtectKernelLogs=true
 ProtectKernelModules=true
 ProtectKernelTunables=true
 ProtectProc=invisible
-ProtectSystem=strict
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 RestrictNamespaces=true
 RestrictRealtime=true
-RestrictSUIDSGID=true
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM

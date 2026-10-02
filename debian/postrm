@@ -2,10 +2,6 @@
 
 set -e
 
-case "$1" in
-    purge)
-        deluser --quiet --system nfl2sl || true
-        ;;
-esac
+# No static user was created, so there is nothing to purge.
 
 #DEBHELPER#

@@ -16,7 +16,6 @@ Architecture: any
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
- adduser,
 Conflicts: nflog-to-syslog
 Replaces: nflog-to-syslog
 Description: NFLOG to JSON-to-syslog transport daemon

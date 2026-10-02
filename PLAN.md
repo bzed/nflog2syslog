@@ -210,7 +210,7 @@ dropping packets. `--copy-range`, `--rcvbuf`, `--queue-size`,
    IPv4 layers; DEP-8 wrapper in `debian/tests/`). **Not yet executed —
    needs a root shell**; run `sudo make integration-test` (see TESTING.md §4).
 7. **Packaging** — **done and verified** (systemd unit with hardening +
-   `nfl2sl` system user, `/etc/default` config, plain debhelper+cargo rules
+   systemd `DynamicUser=yes` (no static user), `/etc/default` config, plain debhelper+cargo rules
    with vendored offline builds, man page, DEP-8 autopkgtest, `.gitlab-ci.yml`
    with salsa-ci). Verified: `make vendor && dpkg-buildpackage -us -uc -b`
    builds, runs the full test suite during build, lintian-clean except the

@@ -196,9 +196,11 @@ journalctl -u nflog2syslog -n 20      # stats lines; hardening active
 sudo journalctl -f | grep nflog       # or configure DEST to your SIEM
 ```
 
-Expected: unit runs as `nfl2sl` with `CAP_NET_ADMIN` (check
-`systemctl show nflog2syslog -p AmbientCapabilities`), restarts on
-failure, and the postinst created the system user (`id nfl2sl`).
+Expected: unit runs as a transient dynamic user (UID in 61184-65519,
+no `/etc/passwd` entry; check `ps -o uid= -C nflog2syslog` and
+`systemctl show nflog2syslog -p DynamicUser` -> yes) with
+`CAP_NET_ADMIN` (check `systemctl show nflog2syslog -p
+AmbientCapabilities`), and restarts on failure.
 
 Autopkgtest (runs §4 against the installed package):
 

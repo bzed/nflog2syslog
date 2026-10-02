@@ -11,7 +11,7 @@ PROTO="udp"
 # The daemon fails to start if this is false while DEST is empty.
 LOG_STDOUT="true"
 
-# NFLOG group to listen on. Must match the --nflog-group of your iptables rules.
+# NFLOG group to listen on. Must match the nft "log group" of your rules.
 NFLOG_GROUP="0"
 
 # Seconds between stderr statistics reports (drops, processed). 0 disables.
