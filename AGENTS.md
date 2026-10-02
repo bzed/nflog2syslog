@@ -28,8 +28,9 @@ cargo test
   gate and fails the build below it.
 - Every new module or function ships with tests. Pure logic gets unit tests
   in `src/` (`#[cfg(test)]`); parsing/formatting gets golden tests in
-  `tests/` with byte-level fixtures. Tests must pass both unprivileged and
-  as root (guard root-only assertions with a `geteuid()` check).
+  `tests/` with byte-level fixtures. Tests must pass in every environment
+  (unprivileged, root, containers that run as root without CAP_NET_ADMIN):
+  assert the documented outcome per case instead of branching on the uid.
 - Only code that is untestable without a live kernel (the netlink receive
   loop in `src/receiver.rs`, error paths that kill the process) may go
   uncovered; prefer factoring the testable part out over leaving it dark.
