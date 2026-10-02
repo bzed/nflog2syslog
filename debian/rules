@@ -6,10 +6,16 @@
 # requires 1.88), so builds can point CARGO at a rustup-installed cargo:
 #   CARGO=$HOME/.cargo/bin/cargo dpkg-buildpackage -us -uc -b -d
 
-# CARGO can point at a specific cargo binary (e.g. a rustup toolchain).
-# NOTE: an empty CARGO in the environment counts as defined for make,
+# CARGO/RUSTC can point at specific binaries (e.g. a rustup toolchain).
+# NOTE: an empty value in the environment counts as defined for make,
 # so ?= alone does not fall back - use $(or ...).
 CARGO := $(or $(strip $(CARGO)),cargo)
+# cargo must not reach rustc through a rustup shim: shims may try to
+# download missing toolchain components (rust-src) during the build,
+# and parallel rustc invocations race inside ~/.rustup/downloads.
+# RUSTC is exported so cargo picks it up.
+RUSTC := $(or $(strip $(RUSTC)),rustc)
+export RUSTC
 
 # prefer distro cargo over rustup shims when both are installed (rustup
 # proxies cannot always resolve a toolchain in the build environment)

@@ -153,10 +153,15 @@ jobs:
           # rustup visible within this one as well
           export PATH="$HOME/.cargo/bin:$PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          # point the debian/rules CARGO indirection at the real toolchain
-          # binary, not the rustup shim (shims are fragile in sanitized
-          # build environments)
+          # pre-install rust-src so a shim run during the build does not
+          # decide to fetch missing components (parallel downloads race
+          # in ~/.rustup/downloads and fail)
+          rustup component add rust-src
+          # point the debian/rules CARGO/RUSTC indirections at the real
+          # toolchain binaries, not the rustup shims (shims are fragile
+          # in sanitized build environments)
           echo "CARGO=$(rustup which cargo)" >> "$GITHUB_ENV"
+          echo "RUSTC=$(rustup which rustc)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - run: make vendor
       # -d skips the Build-Depends check: the toolchain comes from rustup,
