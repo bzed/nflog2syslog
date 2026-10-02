@@ -81,3 +81,18 @@ No new `unsafe` for something the standard library already provides.
 - Vendored builds (`make vendor`) feed the package build; after touching
   `Cargo.toml`, re-run `make vendor` so `vendor/` stays consistent.
 - Version bumps go into `debian/changelog` in the same commit.
+
+## Releases
+
+1. Update the version in `Cargo.toml` (the single source of the version).
+   Run any cargo command afterwards so `Cargo.lock` picks it up, and commit
+   it together.
+2. Add a new entry at the top of `debian/changelog` with the new version
+   (`nflog2syslog (<version>-1) ...`) summarizing the changes since the
+   previous entry.
+3. Tag `v<version>` and push the tag. The `release` workflow then builds
+   the binary tarball and the `.deb` and publishes both as the GitHub
+   release, with a `SHA256SUMS` file.
+4. The release workflow verifies the tag matches both `Cargo.toml` and the
+   top `debian/changelog` entry before building — a mismatched or
+   half-bumped release cannot be published.

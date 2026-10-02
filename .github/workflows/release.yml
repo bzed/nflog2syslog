@@ -11,8 +11,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # AGENTS.md "Releases": the tag must match the version in Cargo.toml and
+  # the topmost debian/changelog entry before anything gets built.
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag must match Cargo.toml and debian/changelog
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          CHANGELOG_VERSION=$(sed -n '1s/^nflog2syslog (\(.*\)-[0-9]*) .*/\1/p' debian/changelog)
+          echo "tag: $TAG, Cargo.toml: $CARGO_VERSION, changelog: $CHANGELOG_VERSION"
+          [ "$TAG" = "$CARGO_VERSION" ] || {
+            echo "Error: tag v$TAG does not match Cargo.toml version $CARGO_VERSION"; exit 1; }
+          [ "$TAG" = "$CHANGELOG_VERSION" ] || {
+            echo "Error: tag v$TAG does not match debian/changelog version $CHANGELOG_VERSION"; exit 1; }
+
   # release binary for the runner platform (release profile already strips)
   binary:
+    needs: version-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +51,7 @@ jobs:
 
   # Debian package, built against the oldest supported distro toolchain
   deb:
+    needs: version-check
     runs-on: ubuntu-latest
     container:
       image: debian:trixie
