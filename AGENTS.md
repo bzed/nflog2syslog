@@ -1,7 +1,9 @@
 # AGENTS.md — nflog2syslog
 
-Clean-room Rust rewrite of nflog-to-syslog: NFLOG over netlink → packet
-dissection → JSON to stdout/remote syslog. Apache-2.0.
+nflog2syslog: NFLOG over netlink → packet dissection → JSON to
+stdout/remote syslog. Apache-2.0. Design history and rationale live in
+`PLAN.md` — do not reference the (unpublished) predecessor tool in
+user-facing docs, packaging metadata, or code.
 
 ## Toolchain
 
@@ -54,8 +56,8 @@ No new `unsafe` for something the standard library already provides.
 - Keep the dependency tree minimal. Prefer std over a crate; drop crates
   that became unused.
 - Licenses: Apache-2.0 / MIT / BSD only (the whole tree, transitive
-  included). No GPL/LGPL/AGPL anywhere — this is a deliberate clean-room
-  decision against the old tool's licensing.
+  included). No GPL/LGPL/AGPL anywhere — this is a deliberate decision
+  (see `PLAN.md`).
 - `Cargo.lock` is committed and built with `--locked` in packaging; update
   it in the same commit as `Cargo.toml` changes.
 - The dissectors come from the packet-dissector crate, enabled via cargo

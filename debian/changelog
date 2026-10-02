@@ -1,15 +1,15 @@
 nflog2syslog (0.1.0-1) stable; urgency=medium
 
-  * Initial release of the clean-room Rust rewrite of nflog-to-syslog.
-    - JSON output per packet instead of key=value lines
+  * Initial release.
+    - one JSON object per logged packet
     - decoupled pipeline with bounded queues and drop accounting
     - SO_RCVBUFFORCE socket sizing (fixes the ENOBUFS log-loss class)
   * Simplified output configuration: JSON on stdout by default
     (disable with --stdout=false), optional remote syslog via
     --dest/--proto (udp default); refuses to start when no sink is
     configured.
-  * Conflicts/Replaces nflog-to-syslog: not a drop-in replacement
-    (different output format and flags), remove the old package on
-    upgrade and adapt downstream log parsers.
+  * Conflicts/Replaces nflog-to-syslog: same NFLOG group must not be
+    consumed by two daemons, and the output format differs — remove the
+    other package on upgrade and adapt downstream log parsers.
 
  -- Bernd Zeimetz <bzed@debian.org>  Wed, 30 Sep 2026 12:00:00 +0200

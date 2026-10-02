@@ -10,9 +10,9 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 Reads packets from the Linux kernel's NFLOG target (netfilter) over a
-netlink socket, dissects them, and forwards one JSON object per packet to
-syslog. Clean-room Rust rewrite of `nflog-to-syslog`; output is structured
-JSON instead of the old `key=value` line format.
+netlink socket, dissects them, and forwards one JSON object per packet
+to syslog — stdout/journald locally, a remote syslog server, or both.
+Output is structured JSON, one object per logged packet.
 
 Licensed under Apache-2.0. See `PLAN.md` for the design and rationale.
 
@@ -24,8 +24,8 @@ netlink recv thread -> [bounded queue] -> dissect/format worker
 ```
 
 - Every queue is bounded and fed with `try_send`: a stalled syslog server
-  causes counted, reported drops — never a stalled kernel socket (the root
-  cause of the old tool's `ENOBUFS`/lost-log problems).
+  causes counted, reported drops — never a stalled kernel socket (the
+  classic `ENOBUFS`/lost-log failure mode of NFLOG readers).
 - The netlink socket is enlarged with `SO_RCVBUFFORCE` (8 MiB default),
   falling back to `SO_RCVBUF` without `CAP_NET_ADMIN`.
 - Dissection is done by the [packet-dissector](https://crates.io/crates/packet-dissector)
