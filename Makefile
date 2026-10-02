@@ -20,8 +20,13 @@ check: test
 vendor:
 	mkdir -p .cargo
 	cargo vendor --locked vendor > .cargo/config.toml
-	find vendor -name .cargo-checksum.json -exec sh -c \
-	  'jq "del(.files[\"Cargo.toml.orig\"], .files[\".cargo_vcs_info.json\"])" "$$1" > "$$1.tmp" && mv "$$1.tmp" "$$1"' _ {} \;
+	set -e; command -v jq >/dev/null || { echo 'Error: make vendor requires jq' >&2; exit 1; }; \
+	for f in $$(find vendor -name .cargo-checksum.json); do \
+	  jq 'del(.files["Cargo.toml.orig"], .files[".cargo_vcs_info.json"])' "$$f" > "$$f.tmp"; \
+	  mv "$$f.tmp" "$$f"; \
+	done
+	@if grep -rq '"Cargo.toml.orig"\|".cargo_vcs_info.json"' vendor/; then \
+	  echo 'Error: stale vendored checksums remain' >&2; exit 1; fi
 
 deb: vendor
 	dpkg-buildpackage -us -uc -b

@@ -141,7 +141,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential debhelper lintian git ca-certificates curl
+            build-essential debhelper lintian git ca-certificates curl jq
       - name: install rust via rustup
         # Debian's rustc is older than the dependency set needs (time 0.3.55
         # requires rustc 1.88) and the packaged rustup fails in containers,
