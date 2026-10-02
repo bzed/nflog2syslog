@@ -16,6 +16,9 @@ syslog = "7"
 time = { version = "0.3", features = ["formatting", "macros"] }
 clap = { version = "4", features = ["derive"] }
 
+[dev-dependencies]
+libc = "0.2"
+
 [features]
 default = [
     "packet-dissector/raw_ip",

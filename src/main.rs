@@ -30,6 +30,8 @@ extern "C" fn on_signal(_sig: libc::c_int) {
 }
 
 fn install_signal_handlers() {
+    // SAFETY: sigaction with a handler installed for our own process; the
+    // sa_sigaction cast matches the sa_flags we set (no SA_SIGINFO).
     unsafe {
         let act = libc::sigaction {
             sa_sigaction: on_signal as *const () as usize,

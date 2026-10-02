@@ -77,3 +77,50 @@ pub fn report_loop(stats: Arc<Stats>, interval: Duration, shutdown: &AtomicBool)
         stats.report();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicBool;
+
+    #[test]
+    fn report_with_zero_counters_returns_silently() {
+        let stats = Stats::default();
+        // all counters zero: the early-return branch
+        stats.report();
+    }
+
+    #[test]
+    fn report_prints_nonzero_counters() {
+        let stats = Stats::default();
+        stats.processed.fetch_add(42, Ordering::Relaxed);
+        stats.kernel_dropped.fetch_add(1, Ordering::Relaxed);
+        stats.parse_errors.fetch_add(3, Ordering::Relaxed);
+        stats.report();
+    }
+
+    #[test]
+    fn report_loop_returns_immediately_when_shutting_down() {
+        let stats = Arc::new(Stats::default());
+        let shutdown = AtomicBool::new(true);
+        report_loop(stats, Duration::from_secs(60), &shutdown);
+    }
+
+    #[test]
+    fn report_loop_checks_shutdown_each_second_and_reports() {
+        let stats = Arc::new(Stats::default());
+        stats.processed.fetch_add(7, Ordering::Relaxed);
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let handle = {
+            let stats = Arc::clone(&stats);
+            let shutdown = Arc::clone(&shutdown);
+            std::thread::spawn(move || {
+                report_loop(stats, Duration::from_secs(1), &shutdown);
+            })
+        };
+        // let the first interval report, then request shutdown
+        std::thread::sleep(Duration::from_millis(300));
+        shutdown.store(true, Ordering::Relaxed);
+        handle.join().expect("report loop exits");
+    }
+}

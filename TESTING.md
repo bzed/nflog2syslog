@@ -10,7 +10,8 @@ and pull request via GitHub Actions (`.github/workflows/ci.yml`) — the
 root integration test runs there because GitHub runners have passwordless
 sudo. Test results (JUnit XML via cargo-nextest) are published as PR
 comments/artifacts, and coverage (cargo-llvm-cov) is uploaded to Codecov
-(needs a CODECOV_TOKEN secret on private repos). GitLab CI (`.gitlab-ci.yml`) additionally builds the Debian package
+(needs a CODECOV_TOKEN secret on private repos) and gated at >= 85% line
+coverage (excluding `src/main.rs`, per `AGENTS.md`). GitLab CI (`.gitlab-ci.yml`) additionally builds the Debian package
 with salsa-ci. Pushing a `v*` tag triggers `.github/workflows/release.yml`,
 which publishes the binary tarball, the `.deb`, and checksums as a GitHub
 release. The checks below are what CI runs — run them manually when

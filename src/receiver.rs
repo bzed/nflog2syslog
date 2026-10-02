@@ -127,6 +127,8 @@ impl Receiver {
                 revents: 0,
             };
             let mut poll = poll;
+            // SAFETY: poll is a valid libc::pollfd pointing at one element;
+            // poll only mutates it and never retains the pointer.
             let r = unsafe { libc::poll(&mut poll, 1, 1000) };
             if r < 0 && std::io::Error::last_os_error().raw_os_error() != Some(libc::EINTR) {
                 eprintln!("poll failed: {}", std::io::Error::last_os_error());
@@ -176,6 +178,8 @@ impl Receiver {
 
 fn set_receive_buffer(fd: i32, size: usize) -> Result<(), String> {
     let sz = size as libc::c_uint;
+    // SAFETY: fd is an open socket (owned by Receiver), sz is a valid
+    // c-sized option value of the size passed as optlen.
     let rc = unsafe {
         libc::setsockopt(
             fd,
@@ -189,6 +193,7 @@ fn set_receive_buffer(fd: i32, size: usize) -> Result<(), String> {
         return Ok(());
     }
     // EPERM without CAP_NET_ADMIN: fall back to the capped variant
+    // SAFETY: same fd and option-value shape as SO_RCVBUFFORCE above.
     let rc = unsafe {
         libc::setsockopt(
             fd,

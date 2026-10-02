@@ -17,6 +17,7 @@
 //! it fills the bounded queue, which drops with accounting instead.
 
 use crate::stats::Stats;
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
@@ -52,11 +53,18 @@ impl Sinks {
             stdout: cfg.stdout,
         };
         if let Some((proto, dest)) = &cfg.remote {
+            // syslog::udp()/tcp() resolve their server argument with
+            // ToSocketAddrs, so pass a parsed IP:port instead of the raw
+            // string (a ("ip:port", 0) tuple does not resolve).
+            let addr: SocketAddr = dest
+                .parse()
+                .map_err(|e| format!("invalid syslog destination {dest:?}: {e}"))?;
+            let local = if addr.is_ipv6() { "::" } else { "0.0.0.0" };
             let logger = match proto.as_str() {
-                "udp" => syslog::udp(formatter(), ("0.0.0.0", 0), (dest.as_str(), 0))
+                "udp" => syslog::udp(formatter(), (local, 0), addr)
                     .map_err(|e| format!("udp syslog to {dest}: {e}"))?,
                 // validated by Cli::validate()
-                _ => syslog::tcp(formatter(), dest.as_str())
+                _ => syslog::tcp(formatter(), addr)
                     .map_err(|e| format!("tcp syslog to {dest}: {e}"))?,
             };
             sinks.remote = Some(logger);

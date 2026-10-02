@@ -227,3 +227,105 @@ fn ipv6_udp_layers() {
     assert!(layers.as_object().unwrap().contains_key("UDP"));
     assert_eq!(json["hw_protocol"], "IPV6");
 }
+
+/// IPv4 + UDP + DHCP DISCOVER: exercises the I32 (time offset), Str
+/// (message type name) and Scratch (unknown option bytes) field values.
+#[test]
+fn ipv4_udp_dhcp_layers() {
+    let mut dhcp = vec![0u8; 240];
+    dhcp[0] = 1; // op: BOOTREQUEST
+    dhcp[1] = 1; // htype: Ethernet
+    dhcp[2] = 6; // hlen
+    dhcp[3] = 0; // hops
+    dhcp[4..8].copy_from_slice(&0x12345678u32.to_be_bytes()); // xid
+    dhcp[8..10].copy_from_slice(&10u16.to_be_bytes()); // secs
+    dhcp[10..12].copy_from_slice(&0x8000u16.to_be_bytes()); // flags: broadcast
+    dhcp[28..34].copy_from_slice(&[0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]); // chaddr
+    dhcp[236..240].copy_from_slice(&[99, 130, 83, 99]); // magic cookie
+                                                        // option 53: DHCP message type = DISCOVER
+    dhcp.extend_from_slice(&[53, 1, 1]);
+    // option 2: time offset = -3600 seconds (I32 field value)
+    dhcp.extend_from_slice(&[2, 4, 0xff, 0xff, 0xf2, 0x30]);
+    // option 12: hostname (Str field value)
+    dhcp.extend_from_slice(&[12, 4, b'h', b'o', b's', b't']);
+    // option 99: unknown to the dissector -> raw Scratch bytes
+    dhcp.extend_from_slice(&[99, 3, 0x01, 0x02, 0x03]);
+    dhcp.extend_from_slice(&[255]); // end option
+    dhcp.extend_from_slice(&[0, 0, 0]); // padding to 4-byte alignment
+
+    let mut pkt = Vec::new();
+    let total = 20 + 8 + dhcp.len();
+    pkt.extend_from_slice(&[0x45, 0x00]);
+    pkt.extend_from_slice(&(total as u16).to_be_bytes());
+    pkt.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    pkt.extend_from_slice(&[64, 17]); // ttl, proto=UDP
+    pkt.extend_from_slice(&[0x00, 0x00]);
+    pkt.extend_from_slice(&[192, 168, 1, 10]);
+    pkt.extend_from_slice(&[255, 255, 255, 255]);
+    pkt.extend_from_slice(&68u16.to_be_bytes());
+    pkt.extend_from_slice(&67u16.to_be_bytes());
+    pkt.extend_from_slice(&((8 + dhcp.len()) as u16).to_be_bytes());
+    pkt.extend_from_slice(&[0x00, 0x00]);
+    pkt.extend_from_slice(&dhcp);
+
+    let json = format_packet(0x0800, &pkt);
+    let layers = &json["layers"];
+    assert!(
+        layers.as_object().unwrap().contains_key("DHCP"),
+        "layers: {layers}"
+    );
+}
+
+/// IPv4 + UDP + NTP client request: NTP timestamps are U64 field values.
+#[test]
+fn ipv4_udp_ntp_layers() {
+    let mut ntp = Vec::new();
+    ntp.extend_from_slice(&[0x1b]); // LI=0, VN=3, mode=3 (client)
+    ntp.extend_from_slice(&[0, 0, 0]); // stratum, poll, precision
+    ntp.extend_from_slice(&0u32.to_be_bytes()); // root delay
+    ntp.extend_from_slice(&0u32.to_be_bytes()); // root dispersion
+    ntp.extend_from_slice(&[0, 0, 0, 0]); // reference id
+    ntp.extend_from_slice(&[0u8; 8]); // reference timestamp
+    ntp.extend_from_slice(&[0u8; 8]); // origin timestamp
+    ntp.extend_from_slice(&[0u8; 8]); // receive timestamp
+    ntp.extend_from_slice(&[0xe6, 0x2f, 0x8a, 0x3c, 0, 0, 0, 0]); // transmit ts
+
+    let mut pkt = Vec::new();
+    let total = 20 + 8 + ntp.len();
+    pkt.extend_from_slice(&[0x45, 0x00]);
+    pkt.extend_from_slice(&(total as u16).to_be_bytes());
+    pkt.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    pkt.extend_from_slice(&[64, 17]);
+    pkt.extend_from_slice(&[0x00, 0x00]);
+    pkt.extend_from_slice(&[10, 0, 0, 1]);
+    pkt.extend_from_slice(&[10, 0, 0, 2]);
+    pkt.extend_from_slice(&12345u16.to_be_bytes());
+    pkt.extend_from_slice(&123u16.to_be_bytes());
+    pkt.extend_from_slice(&((8 + ntp.len()) as u16).to_be_bytes());
+    pkt.extend_from_slice(&[0x00, 0x00]);
+    pkt.extend_from_slice(&ntp);
+
+    let json = format_packet(0x0800, &pkt);
+    let layers = &json["layers"];
+    assert!(
+        layers.as_object().unwrap().contains_key("NTP"),
+        "layers: {layers}"
+    );
+}
+
+/// A missing hw_protocol still dissects as raw IP (the default path).
+#[test]
+fn missing_hw_protocol_dissects_as_raw_ip() {
+    let pkt = NflogPacket {
+        hw_protocol: None,
+        hook: Some(0),
+        payload: Some(ipv4_udp_dns()),
+        ..Default::default()
+    };
+    let mut fmt = Formatter::new();
+    let errors = AtomicU64::new(0);
+    let json: Value = serde_json::from_str(&fmt.format(&pkt, &errors)).unwrap();
+    assert!(json["hw_protocol"].is_null());
+    assert!(json["layers"].is_object());
+    assert!(json["layers"]["IPv4"].is_object());
+}

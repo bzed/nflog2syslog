@@ -132,10 +132,14 @@ fn opt_timestamp(ts: Option<(i64, i64)>) -> Value {
 
 fn interface_name(index: u32) -> String {
     let mut name = [0i8; libc::IF_NAMESIZE];
+    // SAFETY: name is a valid IF_NAMESIZE buffer; if_indextoname writes a
+    // NUL-terminated string into it and returns its pointer, or NULL.
     let ptr = unsafe { libc::if_indextoname(index, name.as_mut_ptr()) };
     if ptr.is_null() {
         return "<invalid>".to_string();
     }
+    // SAFETY: if_indextoname returned a pointer into `name`, which is
+    // NUL-terminated by the contract above.
     unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
 }
 

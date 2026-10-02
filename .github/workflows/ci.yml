@@ -70,7 +70,17 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - name: run tests with coverage instrumentation
-        run: cargo llvm-cov --codecov --output-path coverage.json
+        run: cargo llvm-cov --codecov --ignore-filename-regex 'src/main\.rs' --output-path coverage.json
+      - name: enforce the 85% coverage gate (AGENTS.md)
+        # src/main.rs is binary wiring, exercised by the smoke and
+        # integration jobs; it is excluded from the measurement.
+        # The last percentage on the TOTAL line is line coverage.
+        run: |
+          COVER=$(cargo llvm-cov --summary-only \
+            --ignore-filename-regex 'src/main\.rs' 2>/dev/null | \
+            awk '/^TOTAL/ { for (i = 1; i <= NF; i++) if ($i ~ /%$/) last = $i; gsub(/%/, "", last); print last }')
+          echo "line coverage: ${COVER}%"
+          awk -v c="$COVER" 'BEGIN { exit !(c + 0 >= 85) }'
       - name: upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
