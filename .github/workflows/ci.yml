@@ -40,7 +40,9 @@ jobs:
         run: cargo nextest run --profile ci
       - name: publish test results
         uses: codecov/basic-test-results@v1
-        if: always()
+        # the action posts a summary comment on the PR; it needs the
+        # pull_request context and cannot resolve a PR on plain pushes
+        if: always() && github.event_name == 'pull_request'
         # reporting only: the nextest run itself is the gate, a failing
         # upload (e.g. fork PRs where the token cannot comment) must not
         # break the pipeline
