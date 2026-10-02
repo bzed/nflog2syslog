@@ -49,6 +49,9 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
             | sh -s -- -y --profile minimal --default-toolchain stable
+          # GITHUB_PATH only takes effect for subsequent steps, so make
+          # rustup visible within this one as well
+          export PATH="$HOME/.cargo/bin:$PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           # point the debian/rules CARGO indirection at the real toolchain
           # binary, not the rustup shim (shims are fragile in sanitized
