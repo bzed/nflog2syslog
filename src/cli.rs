@@ -23,7 +23,7 @@ use clap::Parser;
     about = "Read kernel NFLOG packets via netlink, dissect them, forward them as JSON to syslog"
 )]
 pub struct Cli {
-    /// NFLOG group to listen on (iptables ... -j NFLOG --nflog-group N)
+    /// NFLOG group to listen on (nftables: nft add rule ... log group N)
     #[arg(long, default_value_t = 0)]
     pub nflog_group: u16,
 

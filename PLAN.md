@@ -135,7 +135,7 @@ One JSON object per logged packet (syslog message body):
 
 ```json
 {
-  "prefix": "iptables-rule-comment",
+  "prefix": "nftables-rule-comment",
   "timestamp": "2026-09-30T12:34:56.789012Z",
   "in_dev": "eth0",
   "out_dev": null,
