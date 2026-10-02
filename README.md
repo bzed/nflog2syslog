@@ -66,8 +66,9 @@ nflog2syslog [--nflog-group N] [--dest ip:port] [--proto udp|tcp]
   to switch to TCP); no `--dest` means no remote sink.
 - The daemon refuses to start when no sink is configured: stdout logging
   disabled and no `--dest` given.
-- Matching firewall rule: `iptables -A FORWARD -j NFLOG --nflog-group 5`
-  with `--nflog-group 5`.
+- Matching firewall rule: `nft add rule inet filter forward log prefix
+  "fw-drop: " group 5` — the `log group` statement sends packets through
+  the kernel's nfnetlink_log, which is what nflog2syslog reads.
 
 Requires `CAP_NET_ADMIN` (the NFLOG bind needs it anyway; it also enables
 the `SO_RCVBUFFORCE` path).

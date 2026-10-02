@@ -123,6 +123,8 @@ jobs:
       - run: cargo build --release --locked
       - name: load the nfnetlink_log kernel module
         run: sudo modprobe nfnetlink_log || true
+      - name: install the tools the integration test uses
+        run: sudo apt-get update && sudo apt-get install -y nftables jq
       - name: root integration test
         run: >
           sudo NFLOG2SYSLOG_BIN=$PWD/target/release/nflog2syslog

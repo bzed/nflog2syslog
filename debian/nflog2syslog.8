@@ -7,7 +7,8 @@ nflog2syslog \- forward kernel NFLOG packets to syslog as JSON
 [\fIOPTIONS\fR]
 .SH DESCRIPTION
 .B nflog2syslog
-binds to a Linux kernel NFLOG group (netfilter's NFLOG target) over a
+binds to a Linux kernel NFLOG group (nftables \fBlog group\fR logging via
+netfilter's nfnetlink_log) over a
 netlink socket, dissects every logged packet into protocol layers
 (IPv4/IPv6, TCP/UDP, ICMP, ARP, GRE, DNS, DHCP, NTP, SNMP and more), and
 forwards one JSON object per packet to syslog — the local syslog socket by
@@ -28,8 +29,8 @@ are written to stderr every \fB\-\-stats\-interval\fR seconds when nonzero.
 .SH OPTIONS
 .TP
 .BR \-\-nflog\-group " " \fIGROUP\fR
-NFLOG group to listen on; must match the \fB\-\-nflog\-group\fR of your
-iptables/nftables rules. Default: 0.
+NFLOG group to listen on; must match the group of your nftables logging
+rule (\fBlog group\fR \fIGROUP\fR). Default: 0.
 .TP
 .BR \-\-dest " " \fIIP:PORT\fR
 Remote syslog destination, e.g. 192.0.2.1:514. Absent (default): no remote
@@ -71,7 +72,16 @@ Default configuration read by the systemd unit
 .B SIGTERM / SIGINT
 trigger a graceful shutdown: the NFLOG group is unbound and queued
 messages are drained to the configured sinks before exiting.
+.SH EXAMPLE
+Match traffic with an nftables rule that logs to NFLOG group 5 (the
+.B log group
+statement sends matching packets through nfnetlink_log):
+.PP
+.nf
+nft add rule inet filter forward log prefix "fw-drop: " group 5
+nflog2syslog --nflog-group 5 --dest 192.0.2.1:514
+.fi
 .SH SEE ALSO
-.BR iptables\-extensions (8),
+.BR nft (8),
 .BR syslog (3),
 .BR systemd (1)

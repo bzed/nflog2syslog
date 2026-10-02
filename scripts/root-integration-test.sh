@@ -17,7 +17,7 @@
 #
 # Runs everything inside a throwaway network namespace:
 #   - bring up lo
-#   - install an iptables NFLOG rule for ICMP on INPUT
+#   - install an nftables log rule for ICMP on input (log group)
 #   - run nflog2syslog against that NFLOG group, output to stdout
 #   - generate traffic (ping 127.0.0.1)
 #   - assert valid JSON lines with the expected layers
@@ -35,7 +35,7 @@ if [ "$(id -u)" -ne 0 ]; then
     echo "SKIP: needs root (try: sudo $0)"
     exit 77
 fi
-for tool in unshare iptables ip ping jq timeout; do
+for tool in unshare nft ip ping jq timeout; do
     command -v "$tool" >/dev/null || { echo "SKIP: $tool not installed"; exit 77; }
 done
 
@@ -53,9 +53,12 @@ unshare --net bash -euo pipefail -c "
     OUT='$OUT'
     BIN='$BIN'
     ip link set lo up
-    iptables -A INPUT -i lo -p icmp -j NFLOG --nflog-group \$GROUP \
-        --nflog-prefix "test-integration" \
-        || { echo 'FAIL: could not install NFLOG rule (kernel module missing?)'; exit 1; }
+    nft add table ip nflog2syslog-test \
+        || { echo 'FAIL: could not add nftables table (kernel module missing?)'; exit 1; }
+    nft add chain ip nflog2syslog-test input '{ type filter hook input priority 0; }'
+    nft add rule ip nflog2syslog-test input iifname "lo" ip protocol icmp \
+        log group \$GROUP prefix "test-integration" counter \
+        || { echo 'FAIL: could not install NFLOG rule (nfnetlink_log missing?)'; exit 1; }
     \$BIN --nflog-group \$GROUP --stats-interval 1 > \"\$OUT\" 2>/tmp/nflog2syslog-test.err &
     DAEMON=\$!
     sleep 1

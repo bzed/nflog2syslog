@@ -81,8 +81,9 @@ sudo scripts/root-integration-test.sh
 What it does, inside a throwaway `unshare --net` namespace (nothing on the
 host is touched):
 
-1. brings up `lo`, installs `iptables -A INPUT -i lo -p icmp -j NFLOG
-   --nflog-group 42 --nflog-prefix "test-integration"`
+1. brings up `lo`, installs `nft add rule ip nflog2syslog-test input
+   iifname "lo" ip protocol icmp log group 42 prefix "test-integration"`
+   (own table + base chain)
 2. runs `nflog2syslog --nflog-group 42` on that group (stdout is the default sink)
 3. generates traffic with `ping -c 3 127.0.0.1`
 4. SIGTERMs the daemon (exercises graceful shutdown + group unbind)
@@ -101,7 +102,7 @@ dissection → JSON path. Run it before every release.
 a) Live traffic to stdout:
 
 ```bash
-iptables -A INPUT -p udp --dport 53 -j NFLOG --nflog-group 5 --nflog-prefix "dns-watch"
+nft add rule inet filter input udp dport 53 log prefix "dns-watch" group 5
 ./target/release/nflog2syslog --nflog-group 5 --stats-interval 5
 # in another shell: dig @8.8.8.8 example.com
 ```
@@ -136,7 +137,7 @@ daemon refuses to run without anywhere to log to.
 
 c) Graceful shutdown: send SIGTERM while idle and while traffic flows.
 Expected: `nflog2syslog: unbound from group N` then `nflog2syslog stopped.`
-on stderr, exit within ~1 s, and the iptables NFLOG rule can be re-bound
+on stderr, exit within ~1 s, and the nftables log rule can be re-bound
 by a restarted instance without `EBUSY`-style errors.
 
 ## 6. Backpressure / drop accounting (root)
@@ -187,7 +188,7 @@ Install and service test on a VM:
 
 ```bash
 sudo apt install ./nflog2syslog_0.1.0-1_amd64.deb
-sudo iptables -A INPUT -j NFLOG --nflog-group 5 --nflog-prefix "pkg-test"
+sudo nft add rule inet filter input log prefix "pkg-test" group 5
 sudo sed -i 's/NFLOG_GROUP="0"/NFLOG_GROUP="5"/' /etc/default/nflog2syslog
 sudo systemctl restart nflog2syslog
 journalctl -u nflog2syslog -n 20      # stats lines; hardening active
