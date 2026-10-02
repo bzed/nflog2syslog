@@ -136,10 +136,31 @@ c) No-sink guard (config check):
 Expected: exit code 2 and `Error: no output sink configured: ...` — the
 daemon refuses to run without anywhere to log to.
 
-c) Graceful shutdown: send SIGTERM while idle and while traffic flows.
+d) Graceful shutdown: send SIGTERM while idle and while traffic flows.
 Expected: `nflog2syslog: unbound from group N` then `nflog2syslog stopped.`
 on stderr, exit within ~1 s, and the nftables log rule can be re-bound
 by a restarted instance without `EBUSY`-style errors.
+
+e) Prometheus metrics endpoint:
+
+```bash
+./target/release/nflog2syslog --nflog-group 5 --stats-interval 5 \
+    --metrics-addr 127.0.0.1:9559
+curl -s http://127.0.0.1:9559/metrics | grep -E 'received|dropped|errors'
+```
+
+Expected: the scrape returns text-format metrics with
+`nflog2syslog_packets_received_total`,
+`nflog2syslog_packets_processed_total` (growing with traffic),
+`nflog2syslog_packets_dropped_total{reason=...}`,
+`nflog2syslog_queue_full_events_total{queue=...}`,
+`nflog2syslog_errors_total`, `nflog2syslog_parse_errors_total` and
+the configuration gauges. Only `/metrics` is served; any other path
+is a 404. Without `--metrics-addr` no port is opened
+(`ss -ltn | grep 9559` finds nothing). Under the Debian package, set
+`METRICS_ADDR="127.0.0.1:9559"` in `/etc/default/nflog2syslog`.
+The root integration test (`make integration-test`) scrapes the
+endpoint end-to-end and asserts nonzero received/processed counters.
 
 ## 6. Backpressure / drop accounting (root)
 

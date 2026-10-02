@@ -81,7 +81,7 @@ impl Sinks {
         }
         if let Some(logger) = self.remote.as_mut() {
             if let Err(e) = logger.info(msg) {
-                stats.sink_errors.fetch_add(1, Ordering::Relaxed);
+                stats.sink_errors.inc();
                 eprintln!("remote syslog write failed: {e}");
             }
         }
@@ -106,7 +106,7 @@ pub fn run_sink_thread(
         match queue.recv_timeout(std::time::Duration::from_millis(500)) {
             Ok(msg) => {
                 sinks.send(&msg, &stats);
-                stats.processed.fetch_add(1, Ordering::Relaxed);
+                stats.processed.inc();
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 if shutdown.load(Ordering::Relaxed) {
@@ -119,6 +119,6 @@ pub fn run_sink_thread(
     // final drain
     while let Ok(msg) = queue.try_recv() {
         sinks.send(&msg, &stats);
-        stats.processed.fetch_add(1, Ordering::Relaxed);
+        stats.processed.inc();
     }
 }

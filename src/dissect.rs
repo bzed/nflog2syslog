@@ -20,9 +20,9 @@ use packet_dissector::field::FieldValue;
 pub use packet_dissector::packet::DissectBuffer;
 use packet_dissector::packet::Layer;
 use packet_dissector::registry::DissectorRegistry;
+use prometheus::IntCounter;
 use serde_json::{Map, Value};
 use std::ops::Range;
-use std::sync::atomic::AtomicU64;
 
 /// pcap LINKTYPE_RAW: dissectors entry for raw IPv4/IPv6 payloads.
 const LINKTYPE_RAW: u32 = 101;
@@ -46,7 +46,7 @@ pub(crate) fn dissect_into<'pkt>(
     payload: Option<&'pkt [u8]>,
     hw_protocol: Option<u16>,
     buf: &mut DissectBuffer<'pkt>,
-    parse_errors: &AtomicU64,
+    parse_errors: &IntCounter,
 ) -> Value {
     let Some(payload) = payload else {
         return Value::Null;
@@ -66,7 +66,7 @@ pub(crate) fn dissect_into<'pkt>(
             }
         }
         Err(e) => {
-            parse_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            parse_errors.inc();
             layers.insert("error".into(), Value::String(e.to_string()));
         }
     }

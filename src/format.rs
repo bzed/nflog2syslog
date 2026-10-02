@@ -19,9 +19,9 @@
 use crate::dissect::{build_registry, dissect_into, DissectBuffer};
 use crate::wire::NflogPacket;
 use packet_dissector::registry::DissectorRegistry;
+use prometheus::IntCounter;
 use serde_json::{Map, Value};
 use std::ffi::CStr;
-use std::sync::atomic::AtomicU64;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
@@ -41,7 +41,7 @@ impl Formatter {
     }
 
     /// Format one packet into a single-line JSON string.
-    pub fn format(&mut self, pkt: &NflogPacket, parse_errors: &AtomicU64) -> String {
+    pub fn format(&mut self, pkt: &NflogPacket, parse_errors: &IntCounter) -> String {
         let mut root = Map::new();
         root.insert("prefix".into(), opt_string(pkt.prefix.clone()));
         root.insert("timestamp".into(), opt_timestamp(pkt.timestamp));

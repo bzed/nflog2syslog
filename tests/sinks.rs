@@ -41,7 +41,7 @@ fn stdout_only_sink_sends_nowhere() {
     let mut sinks = Sinks::open(&cfg).expect("open without remote");
     let stats = Stats::default();
     sinks.send("message", &stats);
-    assert_eq!(stats.sink_errors.load(Ordering::Relaxed), 0);
+    assert_eq!(stats.sink_errors.get(), 0);
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn udp_sink_delivers_to_collector() {
     let (n, _) = collector.recv_from(&mut buf).expect("datagram arrives");
     let line = String::from_utf8_lossy(&buf[..n]);
     assert!(line.contains("hello-udp"), "received: {line}");
-    assert_eq!(stats.sink_errors.load(Ordering::Relaxed), 0);
+    assert_eq!(stats.sink_errors.get(), 0);
 }
 
 #[test]
@@ -132,8 +132,8 @@ fn run_sink_thread_drains_queue_and_counts() {
     // dropping the sender disconnects the queue: the thread drains and exits
     drop(tx);
     sink.join().expect("sink thread exits");
-    assert_eq!(stats.processed.load(Ordering::Relaxed), 3);
-    assert_eq!(stats.sink_errors.load(Ordering::Relaxed), 0);
+    assert_eq!(stats.processed.get(), 3);
+    assert_eq!(stats.sink_errors.get(), 0);
 
     let mut received = 0;
     let mut buf = [0u8; 2048];
@@ -164,5 +164,5 @@ fn run_sink_thread_stops_on_shutdown_flag() {
     shutdown.store(true, Ordering::Relaxed);
     // the loop wakes at its 500ms recv_timeout and exits
     sink.join().expect("sink thread exits");
-    assert_eq!(stats.processed.load(Ordering::Relaxed), 1);
+    assert_eq!(stats.processed.get(), 1);
 }

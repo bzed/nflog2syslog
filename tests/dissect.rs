@@ -18,7 +18,10 @@
 use nflog2syslog::format::Formatter;
 use nflog2syslog::wire::NflogPacket;
 use serde_json::Value;
-use std::sync::atomic::AtomicU64;
+
+fn error_counter() -> prometheus::IntCounter {
+    prometheus::IntCounter::new("test_parse_errors", "parse errors in this test").expect("counter")
+}
 
 fn format_packet(hw_protocol: u16, payload: &[u8]) -> Value {
     let pkt = NflogPacket {
@@ -29,9 +32,9 @@ fn format_packet(hw_protocol: u16, payload: &[u8]) -> Value {
         ..Default::default()
     };
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let json: Value = serde_json::from_str(&fmt.format(&pkt, &errors)).expect("valid JSON");
-    assert_eq!(errors.load(std::sync::atomic::Ordering::Relaxed), 0);
+    assert_eq!(errors.get(), 0);
     json
 }
 
@@ -113,7 +116,7 @@ fn arp_layer() {
 #[test]
 fn garbage_payload_reports_error() {
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let pkt = NflogPacket {
         hw_protocol: Some(0x0800),
         payload: Some(vec![0xde, 0xad, 0xbe, 0xef]),
@@ -127,7 +130,7 @@ fn garbage_payload_reports_error() {
 #[test]
 fn no_payload_is_null_layers() {
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let pkt = NflogPacket {
         hw_protocol: Some(0x0800),
         payload: None,
@@ -323,7 +326,7 @@ fn missing_hw_protocol_dissects_as_raw_ip() {
         ..Default::default()
     };
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let json: Value = serde_json::from_str(&fmt.format(&pkt, &errors)).unwrap();
     assert!(json["hw_protocol"].is_null());
     assert!(json["layers"].is_object());

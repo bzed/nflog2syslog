@@ -59,7 +59,7 @@ unshare --net bash -euo pipefail -c "
     nft add rule ip nflog2syslog-test input iifname "lo" ip protocol icmp \
         log group \$GROUP prefix "test-integration" counter \
         || { echo 'FAIL: could not install NFLOG rule (nfnetlink_log missing?)'; exit 1; }
-    \$BIN --nflog-group \$GROUP --stats-interval 1 > \"\$OUT\" 2>/tmp/nflog2syslog-test.err &
+    \$BIN --nflog-group \$GROUP --stats-interval 1 --metrics-addr 127.0.0.1:9559 > \"\$OUT\" 2>/tmp/nflog2syslog-test.err &
     DAEMON=\$!
     sleep 1
     # fail loudly (with the daemon's stderr) if it exited early
@@ -68,6 +68,11 @@ unshare --net bash -euo pipefail -c "
     fi
     ping -c 3 -W 1 127.0.0.1 >/dev/null
     sleep 1
+    # scrape the Prometheus endpoint
+    exec 3<>/dev/tcp/127.0.0.1/9559
+    printf 'GET /metrics HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3
+    timeout 5 cat <&3 > /tmp/nflog2syslog-metrics.out
+    exec 3<&- 3>&-
     kill -TERM \$DAEMON 2>/dev/null || true
     wait \$DAEMON || true
 " || { echo "FAIL: namespace test run failed"; cat /tmp/nflog2syslog-test.err; exit 1; }
@@ -88,6 +93,22 @@ if [ -z "$(jq -r 'select(.prefix == "test-integration")' "$OUT")" ]; then
     head -3 "$OUT"
     exit 1
 fi
+
+echo "== metrics endpoint =="
+# labeled metrics only expose values that were touched, so assert on
+# the counters a clean run is guaranteed to move
+for metric in \
+    'nflog2syslog_packets_received_total [1-9]' \
+    'nflog2syslog_packets_processed_total [1-9]' \
+    'nflog2syslog_nflog_group 42' \
+    '# TYPE nflog2syslog_packets_dropped_total counter'; do
+    if ! grep -Eq "$metric" /tmp/nflog2syslog-metrics.out; then
+        echo "FAIL: metrics scrape missing or does not match: $metric"
+        head -20 /tmp/nflog2syslog-metrics.out
+        exit 1
+    fi
+done
+rm -f /tmp/nflog2syslog-metrics.out
 
 echo "PASS: NFLOG packets dissected end-to-end (IPv4 + ICMP layers present)"
 echo "sample line:"

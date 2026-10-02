@@ -55,6 +55,11 @@ pub struct Cli {
     /// Seconds between stderr statistics reports (0 disables).
     #[arg(long, default_value_t = 10)]
     pub stats_interval: u64,
+
+    /// Prometheus metrics endpoint listen address, e.g. 127.0.0.1:9559.
+    /// Absent or empty: the metrics endpoint is disabled.
+    #[arg(long)]
+    pub metrics_addr: Option<String>,
 }
 
 impl Cli {
@@ -72,7 +77,13 @@ impl Cli {
             other => Err(format!(
                 "unsupported syslog protocol {other:?} (use udp or tcp)"
             )),
+        }?;
+        if let Some(addr) = self.metrics_addr.as_deref().filter(|a| !a.is_empty()) {
+            use std::net::SocketAddr;
+            addr.parse::<SocketAddr>()
+                .map_err(|_| format!("invalid --metrics-addr {addr:?} (expected ip:port)"))?;
         }
+        Ok(())
     }
 }
 
@@ -126,5 +137,35 @@ mod tests {
     fn tcp_proto_is_ok() {
         let c = cli(&["--dest", "192.0.2.1:514", "--proto", "tcp"]);
         assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn metrics_addr_disabled_by_default() {
+        let c = cli(&[]);
+        assert!(c.metrics_addr.is_none());
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn valid_metrics_addr_is_ok() {
+        let c = cli(&["--metrics-addr", "127.0.0.1:9559"]);
+        assert_eq!(c.metrics_addr.as_deref(), Some("127.0.0.1:9559"));
+        assert!(c.validate().is_ok());
+        let c = cli(&["--metrics-addr", "[::1]:9559"]);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn empty_metrics_addr_is_disabled() {
+        let c = cli(&["--metrics-addr", ""]);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn garbage_metrics_addr_fails() {
+        let c = cli(&["--metrics-addr", "not-an-address"]);
+        assert!(c.validate().is_err());
+        let c = cli(&["--metrics-addr", "127.0.0.1"]); // no port
+        assert!(c.validate().is_err());
     }
 }

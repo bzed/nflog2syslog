@@ -16,3 +16,7 @@ NFLOG_GROUP="0"
 
 # Seconds between stderr statistics reports (drops, processed). 0 disables.
 STATS_INTERVAL="10"
+
+# Prometheus metrics endpoint, ip:port. Empty: the endpoint is disabled.
+# Example: METRICS_ADDR="127.0.0.1:9559"
+METRICS_ADDR=""

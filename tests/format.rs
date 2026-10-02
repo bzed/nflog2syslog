@@ -19,7 +19,10 @@
 use nflog2syslog::format::Formatter;
 use nflog2syslog::wire::NflogPacket;
 use serde_json::Value;
-use std::sync::atomic::{AtomicU64, Ordering};
+
+fn error_counter() -> prometheus::IntCounter {
+    prometheus::IntCounter::new("test_parse_errors", "parse errors in this test").expect("counter")
+}
 
 /// Minimal valid IPv4+UDP packet so the layers object is non-error.
 fn ipv4_udp() -> Vec<u8> {
@@ -38,7 +41,7 @@ fn ipv4_udp() -> Vec<u8> {
     pkt
 }
 
-fn format_json(fmt: &mut Formatter, pkt: &NflogPacket, errors: &AtomicU64) -> Value {
+fn format_json(fmt: &mut Formatter, pkt: &NflogPacket, errors: &prometheus::IntCounter) -> Value {
     serde_json::from_str(&fmt.format(pkt, errors)).expect("valid JSON")
 }
 
@@ -63,12 +66,12 @@ fn full_metadata_record() {
         hw_type: Some(1), // ARPHRD_ETHER
     };
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     // two packets through the same formatter: the dissect buffer is reused
     let json = format_json(&mut fmt, &pkt, &errors);
     let again = format_json(&mut fmt, &pkt, &errors);
     assert_eq!(json, again);
-    assert_eq!(errors.load(Ordering::Relaxed), 0);
+    assert_eq!(errors.get(), 0);
 
     assert_eq!(json["prefix"], "fw-drop");
     assert_eq!(json["timestamp"], "2024-09-30T12:40:00.789012Z");
@@ -93,7 +96,7 @@ fn full_metadata_record() {
 fn empty_packet_is_all_nulls() {
     let pkt = NflogPacket::default();
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let json = format_json(&mut fmt, &pkt, &errors);
     for key in [
         "prefix",
@@ -127,14 +130,14 @@ fn unknown_enums_fall_back_to_numeric_names() {
         ..Default::default()
     };
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let json = format_json(&mut fmt, &pkt, &errors);
     assert_eq!(json["hook"], "unknown");
     assert_eq!(json["hw_type"], "<hwtype=0x1234>");
     assert_eq!(json["hw_protocol"], "<ether-type=0x9999>");
     // an unknown EtherType still dissects as raw IP (and fails: not a packet)
     assert!(json["layers"]["error"].is_string());
-    assert_eq!(errors.load(Ordering::Relaxed), 1);
+    assert_eq!(errors.get(), 1);
 }
 
 #[test]
@@ -146,7 +149,7 @@ fn out_of_range_timestamp_is_null() {
         ..Default::default()
     };
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let json = format_json(&mut fmt, &pkt, &errors);
     assert!(json["timestamp"].is_null());
 }
@@ -160,7 +163,7 @@ fn timestamp_beyond_rfc3339_year_is_null() {
         ..Default::default()
     };
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let json = format_json(&mut fmt, &pkt, &errors);
     assert!(json["timestamp"].is_null());
 }
@@ -175,7 +178,7 @@ fn interface_names_resolve_and_invalid_ones_are_marked() {
         ..Default::default()
     };
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     let json = format_json(&mut fmt, &pkt, &errors);
     assert_eq!(json["in_dev"], "lo");
     assert_eq!(json["out_dev"], "<invalid>");
@@ -201,7 +204,7 @@ fn all_arphrd_names_resolve() {
             ..Default::default()
         };
         let mut fmt = Formatter::new();
-        let errors = AtomicU64::new(0);
+        let errors = error_counter();
         let json = format_json(&mut fmt, &pkt, &errors);
         assert_eq!(json["hw_type"], name, "hw_type {hw_type}");
     }
@@ -226,7 +229,7 @@ fn all_ethertype_names_resolve() {
             ..Default::default()
         };
         let mut fmt = Formatter::new();
-        let errors = AtomicU64::new(0);
+        let errors = error_counter();
         let json = format_json(&mut fmt, &pkt, &errors);
         assert_eq!(json["hw_protocol"], name, "hw_protocol {hw_protocol:#06x}");
     }
@@ -248,7 +251,7 @@ fn all_hook_names_resolve() {
             ..Default::default()
         };
         let mut fmt = Formatter::new();
-        let errors = AtomicU64::new(0);
+        let errors = error_counter();
         let json = format_json(&mut fmt, &pkt, &errors);
         assert_eq!(json["hook"], name, "hook {hook}");
     }

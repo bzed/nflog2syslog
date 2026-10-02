@@ -94,7 +94,7 @@ impl Receiver {
             buf.clear();
             if let Err(e) = self.socket.recv(&mut buf, 0) {
                 if e.raw_os_error() == Some(libc::ENOBUFS) {
-                    self.stats.kernel_dropped.fetch_add(1, Ordering::Relaxed);
+                    self.stats.drop_kernel();
                     continue;
                 }
                 return Err(format!("netlink recv: {e}"));
@@ -136,9 +136,9 @@ impl Receiver {
                 if e.raw_os_error() == Some(libc::ENOBUFS) {
                     // kernel dropped queued packets; the count is
                     // per-overflow-event, not per-packet
-                    self.stats.kernel_dropped.fetch_add(1, Ordering::Relaxed);
+                    self.stats.drop_kernel();
                 } else {
-                    self.stats.parse_errors.fetch_add(1, Ordering::Relaxed);
+                    self.stats.parse_errors.inc();
                     eprintln!("netlink recv error: {e}");
                 }
                 continue;
@@ -160,17 +160,20 @@ impl Receiver {
 fn dispatch_datagram(stats: &Stats, buf: &[u8], queue: &SyncSender<NflogPacket>) -> bool {
     for range in wire::message_ranges(buf) {
         let Ok(msg) = NetlinkMessage::<NflogPacket>::deserialize(&buf[range]) else {
-            stats.parse_errors.fetch_add(1, Ordering::Relaxed);
+            stats.parse_errors.inc();
             continue;
         };
         match &msg.payload {
-            NetlinkPayload::InnerMessage(pkt) => match queue.try_send(pkt.clone()) {
-                Ok(()) => {}
-                Err(TrySendError::Full(_)) => {
-                    stats.recv_dropped.fetch_add(1, Ordering::Relaxed);
+            NetlinkPayload::InnerMessage(pkt) => {
+                stats.received.inc();
+                match queue.try_send(pkt.clone()) {
+                    Ok(()) => {}
+                    Err(TrySendError::Full(_)) => {
+                        stats.drop_queue_recv();
+                    }
+                    Err(TrySendError::Disconnected(_)) => return false,
                 }
-                Err(TrySendError::Disconnected(_)) => return false,
-            },
+            }
             // ACKs and errors can only appear while we are in the
             // handshake, not in the receive loop.
             _ => continue,
@@ -283,8 +286,8 @@ mod tests {
         msg
     }
 
-    fn counter(stats: &Stats, f: fn(&Stats) -> &std::sync::atomic::AtomicU64) -> u64 {
-        f(stats).load(Ordering::Relaxed)
+    fn counter(stats: &Stats) -> u64 {
+        stats.dropped_with_label("queue_recv")
     }
 
     #[test]
@@ -306,7 +309,7 @@ mod tests {
         let pkt = rx.try_recv().expect("packet queued");
         assert_eq!(pkt.prefix.as_deref(), Some("fw-drop"));
         assert_eq!(pkt.payload.as_deref(), Some(&[0xde, 0xad, 0xbe, 0xef][..]));
-        assert_eq!(stats.parse_errors.load(Ordering::Relaxed), 0);
+        assert_eq!(stats.parse_errors.get(), 0);
     }
 
     #[test]
@@ -320,7 +323,7 @@ mod tests {
         datagram[5] = 0x05; // type 0x0500: not NFULNL_MSG_PACKET
         datagram.extend_from_slice(&packet_msg(b"x\0", b"p"));
         assert!(dispatch_datagram(&stats, &datagram, &tx));
-        assert_eq!(stats.parse_errors.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.parse_errors.get(), 1);
         assert!(rx.try_recv().is_ok(), "valid packet still delivered");
     }
 
@@ -330,7 +333,7 @@ mod tests {
         let (tx, rx) = sync_channel(4);
         assert!(dispatch_datagram(&stats, &error_msg(7, 0), &tx));
         assert!(rx.try_recv().is_err(), "ACK is not a packet");
-        assert_eq!(stats.parse_errors.load(Ordering::Relaxed), 0);
+        assert_eq!(stats.parse_errors.get(), 0);
     }
 
     #[test]
@@ -339,7 +342,7 @@ mod tests {
         let (tx, rx) = sync_channel(1);
         tx.send(NflogPacket::default()).expect("fill the queue");
         assert!(dispatch_datagram(&stats, &packet_msg(b"x\0", b"p"), &tx));
-        assert_eq!(counter(&stats, |s| &s.recv_dropped), 1);
+        assert_eq!(counter(&stats), 1);
         drop(rx); // silence unused warnings for the receiver end
     }
 
@@ -407,7 +410,7 @@ mod tests {
         handle.join().expect("run loop exits");
 
         // the NACK is not a packet: nothing was parsed, dropped or queued
-        assert_eq!(stats.parse_errors.load(Ordering::Relaxed), 0);
-        assert_eq!(stats.recv_dropped.load(Ordering::Relaxed), 0);
+        assert_eq!(stats.parse_errors.get(), 0);
+        assert_eq!(stats.dropped_with_label("queue_recv"), 0);
     }
 }

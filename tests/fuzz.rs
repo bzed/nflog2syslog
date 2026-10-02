@@ -37,7 +37,10 @@ use nflog2syslog::format::Formatter;
 use nflog2syslog::wire::{message_ranges, packet_msg_type, NflogPacket};
 use serde_json::Value;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::AtomicU64;
+
+fn error_counter() -> prometheus::IntCounter {
+    prometheus::IntCounter::new("test_parse_errors", "parse errors in this test").expect("counter")
+}
 
 /// splitmix64: 6 lines, deterministic, good enough for byte noise.
 struct Rng(u64);
@@ -180,7 +183,7 @@ fn vectors() -> Vec<Vector> {
 
 /// One packet through the full format() path; panics are caught so the
 /// failure message contains the offending bytes.
-fn format_one(fmt: &mut Formatter, pkt: &NflogPacket, errors: &AtomicU64) -> String {
+fn format_one(fmt: &mut Formatter, pkt: &NflogPacket, errors: &prometheus::IntCounter) -> String {
     let result = catch_unwind(AssertUnwindSafe(|| fmt.format(pkt, errors)));
     match result {
         Ok(json) => json,
@@ -201,7 +204,7 @@ fn dissectors_survive_garbage_payloads() {
     for (idx, (name, hw_proto, wrap)) in vectors().iter().enumerate() {
         let mut rng = Rng::new(0xfeed + idx as u64 * 997 + u64::from(*hw_proto));
         let mut fmt = Formatter::new();
-        let errors = AtomicU64::new(0);
+        let errors = error_counter();
         for iteration in 0..150 {
             let payload = rng.bytes(512);
             let pkt = NflogPacket {
@@ -401,7 +404,7 @@ fn dissectors_survive_mutations_of_valid_packets() {
     for (name, hw_proto, seed) in seeds {
         let mut rng = Rng::new(0x5eed + name.len() as u64 * 131 + u64::from(hw_proto));
         let mut fmt = Formatter::new();
-        let errors = AtomicU64::new(0);
+        let errors = error_counter();
         for iteration in 0..200 {
             let mutant = mutate(&mut rng, &seed);
             let pkt = NflogPacket {
@@ -487,7 +490,7 @@ fn format_survives_random_nflog_metadata() {
     // selection and every dissect entry must hold up
     let mut rng = Rng::new(0xC0DE);
     let mut fmt = Formatter::new();
-    let errors = AtomicU64::new(0);
+    let errors = error_counter();
     for iteration in 0..300 {
         let hw_protocol = rng.next() as u16;
         let payload = rng.bytes(256);

@@ -15,13 +15,15 @@
 use clap::Parser;
 use nflog2syslog::cli::Cli;
 use nflog2syslog::format::Formatter;
+use nflog2syslog::metrics;
 use nflog2syslog::receiver::{Receiver, ReceiverConfig};
 use nflog2syslog::sinks::SinkConfig;
 use nflog2syslog::stats::Stats;
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
@@ -52,6 +54,52 @@ fn main() {
     }
 
     let stats = Arc::new(Stats::default());
+
+    // optional Prometheus metrics endpoint (validated by Cli::validate)
+    if let Some(addr) = cli
+        .metrics_addr
+        .clone()
+        .filter(|a| !a.is_empty())
+        .and_then(|a| a.parse::<SocketAddr>().ok())
+    {
+        let start = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let gauges: &[metrics::Gauge] = &[
+            (
+                "nflog2syslog_nflog_group",
+                "NFLOG group this instance listens on",
+                cli.nflog_group as i64,
+            ),
+            (
+                "nflog2syslog_queue_capacity",
+                "Capacity of each internal pipeline queue",
+                cli.queue_size.max(1) as i64,
+            ),
+            (
+                "nflog2syslog_copy_range",
+                "Maximum packet bytes the kernel copies per packet",
+                cli.copy_range as i64,
+            ),
+            (
+                "nflog2syslog_rcvbuf",
+                "Netlink socket receive buffer size in bytes",
+                cli.rcvbuf as i64,
+            ),
+            (
+                "process_start_time_seconds",
+                "Unix timestamp of process start",
+                start,
+            ),
+        ];
+        if let Err(e) = metrics::serve(&stats, addr, gauges) {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+        eprintln!("nflog2syslog: metrics endpoint on http://{addr}/metrics");
+    }
+
     let (q1, rx1) = sync_channel(cli.queue_size.max(1));
     let (q2, rx2) = sync_channel(cli.queue_size.max(1));
 
@@ -80,7 +128,7 @@ fn main() {
             match q2.try_send(msg) {
                 Ok(()) => {}
                 Err(std::sync::mpsc::TrySendError::Full(_)) => {
-                    worker_stats.worker_dropped.fetch_add(1, Ordering::Relaxed);
+                    worker_stats.drop_queue_sink();
                 }
                 Err(std::sync::mpsc::TrySendError::Disconnected(_)) => break,
             }

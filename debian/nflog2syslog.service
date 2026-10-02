@@ -10,7 +10,7 @@ After=network-online.target
 # for the NFLOG netlink config handshake and SO_RCVBUFFORCE.
 DynamicUser=yes
 EnvironmentFile=-/etc/default/nflog2syslog
-ExecStart=/usr/sbin/nflog2syslog --dest=${DEST} --proto=${PROTO} --stdout=${LOG_STDOUT} --nflog-group=${NFLOG_GROUP} --stats-interval=${STATS_INTERVAL}
+ExecStart=/usr/sbin/nflog2syslog --dest=${DEST} --proto=${PROTO} --stdout=${LOG_STDOUT} --nflog-group=${NFLOG_GROUP} --stats-interval=${STATS_INTERVAL} --metrics-addr=${METRICS_ADDR}
 Restart=always
 RestartSec=10s
 AmbientCapabilities=CAP_NET_ADMIN

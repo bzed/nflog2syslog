@@ -58,6 +58,14 @@ sink configured.
 .BR \-\-stats\-interval " " \fISECONDS\fR
 Seconds between stderr statistics reports; 0 disables. Default: 10.
 .TP
+.BR \-\-metrics\-addr " " \fIIP:PORT\fR
+Serve a Prometheus metrics endpoint (text exposition format) on
+\fB/metrics\fR: received and processed packet counters, drops by stage
+(queue and kernel), queue-full events, sink and parse errors, plus
+configuration gauges (NFLOG group, queue capacity, copy range, receive
+buffer, process start time). Absent or empty (default): no listener is
+opened. Example: 127.0.0.1:9559.
+.TP
 .BR \-h ", " \-\-help
 Print help.
 .TP
@@ -67,7 +75,8 @@ Print version.
 .TP
 .I /etc/default/nflog2syslog
 Default configuration read by the systemd unit
-(\fInflog2syslog.service\fR): DEST, PROTO, NFLOG_GROUP, STATS_INTERVAL.
+(\fInflog2syslog.service\fR): DEST, PROTO, NFLOG_GROUP, STATS_INTERVAL,
+METRICS_ADDR.
 .SH SIGNALS
 .B SIGTERM / SIGINT
 trigger a graceful shutdown: the NFLOG group is unbound and queued

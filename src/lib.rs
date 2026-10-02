@@ -25,6 +25,7 @@
 pub mod cli;
 pub mod dissect;
 pub mod format;
+pub mod metrics;
 pub mod receiver;
 pub mod sinks;
 pub mod stats;

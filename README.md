@@ -57,6 +57,7 @@ payloads produce `{"layers":{"error":"..."}}` instead of a panic.
 nflog2syslog [--nflog-group N] [--dest ip:port] [--proto udp|tcp]
              [--stdout true|false] [--copy-range N] [--rcvbuf BYTES]
              [--queue-size N] [--stats-interval SECS]
+             [--metrics-addr ip:port]
 ```
 
 - JSON messages are logged to stdout by default (under systemd they land
@@ -72,6 +73,35 @@ nflog2syslog [--nflog-group N] [--dest ip:port] [--proto udp|tcp]
 
 Requires `CAP_NET_ADMIN` (the NFLOG bind needs it anyway; it also enables
 the `SO_RCVBUFFORCE` path).
+
+## Prometheus metrics
+
+`--metrics-addr 127.0.0.1:9559` (or a `METRICS_ADDR` entry in
+`/etc/default/nflog2syslog`) serves a Prometheus scrape endpoint on
+`/metrics`:
+
+```
+nflog2syslog_packets_received_total
+nflog2syslog_packets_processed_total
+nflog2syslog_packets_dropped_total{reason="queue_recv|queue_sink|kernel"}
+nflog2syslog_queue_full_events_total{queue="recv|sink"}
+nflog2syslog_errors_total
+nflog2syslog_parse_errors_total
+nflog2syslog_nflog_group
+nflog2syslog_queue_capacity
+nflog2syslog_copy_range
+nflog2syslog_rcvbuf
+process_start_time_seconds
+```
+
+Without `--metrics-addr` no listener is opened. Example scrape rule:
+
+```yaml
+scrape_configs:
+  - job_name: nflog2syslog
+    static_configs:
+      - targets: ["firewall-host:9559"]
+```
 
 ## Building
 
