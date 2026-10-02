@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/logo.svg" alt="nflog2syslog logo" width="192">
+</div>
+
 # nflog2syslog
 
 [![CI](https://github.com/bzed/nflog2syslog/actions/workflows/ci.yml/badge.svg)](https://github.com/bzed/nflog2syslog/actions/workflows/ci.yml)
