@@ -36,6 +36,11 @@ cargo test
   uncovered; prefer factoring the testable part out over leaving it dark.
 - Run locally: `cargo llvm-cov --summary-only --ignore-filename-regex 'src/main\.rs'`
   (needs `cargo llvm-cov install`).
+- Parsers must survive garbage: `tests/fuzz.rs` runs seeded, deterministic
+  fuzz-style tests through every enabled dissector entry vector and the
+  NFLOG wire parser — garbage in, valid JSON or a counted error out, never
+  a panic. When a new dissector (feature/entry point) is added, wire it
+  into the vector table there.
 
 ## unsafe policy
 
