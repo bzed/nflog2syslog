@@ -1,5 +1,10 @@
 # nflog2syslog
 
+[![CI](https://github.com/bzed/nflog2syslog/actions/workflows/ci.yml/badge.svg)](https://github.com/bzed/nflog2syslog/actions/workflows/ci.yml)
+[![Release](https://github.com/bzed/nflog2syslog/actions/workflows/release.yml/badge.svg)](https://github.com/bzed/nflog2syslog/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/bzed/nflog2syslog/graph/badge.svg)](https://codecov.io/gh/bzed/nflog2syslog)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 Reads packets from the Linux kernel's NFLOG target (netfilter) over a
 netlink socket, dissects them, and forwards one JSON object per packet to
 syslog. Clean-room Rust rewrite of `nflog-to-syslog`; output is structured
