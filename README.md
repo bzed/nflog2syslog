@@ -86,8 +86,9 @@ Rust >= 1.85 (packet-dissector 0.6 requirement).
 ## CI and releases
 
 - GitHub Actions (`.github/workflows/`): on every push/PR — format, clippy,
-  unit tests (via cargo-nextest, with JUnit XML results published and kept
-  as artifacts), coverage (cargo-llvm-cov uploaded to Codecov, gated at
+  unit tests (via cargo-nextest, with JUnit XML results uploaded to
+  Codecov's test analytics, posted as PR comments, and kept as
+  artifacts), coverage (cargo-llvm-cov uploaded to Codecov, gated at
   >= 85% line coverage — see `AGENTS.md`), the
   unprivileged EPERM smoke test, the root-only end-to-end integration test
   (runners have passwordless sudo), and a Debian package build with lintian

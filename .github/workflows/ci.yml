@@ -26,8 +26,9 @@ jobs:
       - run: rustup component add clippy
       - run: cargo clippy --all-targets -- -D warnings
 
-  # TESTING.md §2: unit + golden tests, with JUnit XML results uploaded
-  # to GitHub (test report + PR comment) and kept as an artifact.
+  # TESTING.md §2: unit + golden tests. JUnit XML results are uploaded to
+  # Codecov (test analytics), posted as a PR comment, and kept as an
+  # artifact.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -38,7 +39,20 @@ jobs:
           tool: cargo-nextest
       - name: run tests (JUnit XML report)
         run: cargo nextest run --profile ci
-      - name: publish test results
+      - name: upload test results to Codecov
+        # basic-test-results (below) is local-only -- it posts a PR
+        # comment but never uploads. This is the action that actually
+        # delivers the JUnit report to Codecov's test analytics.
+        # fail_ci_if_error off: a missing CODECOV_TOKEN (private repos
+        # need it as a secret) must not break the pipeline.
+        uses: codecov/test-results-action@v1
+        if: always()
+        with:
+          files: target/nextest/ci/junit.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: publish test results as a PR comment
         uses: codecov/basic-test-results@v1
         # the action posts a summary comment on the PR; it needs the
         # pull_request context and cannot resolve a PR on plain pushes
