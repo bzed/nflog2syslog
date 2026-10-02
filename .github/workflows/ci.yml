@@ -41,10 +41,16 @@ jobs:
       - name: publish test results
         uses: codecov/basic-test-results@v1
         if: always()
+        # reporting only: the nextest run itself is the gate, a failing
+        # upload (e.g. fork PRs where the token cannot comment) must not
+        # break the pipeline
+        continue-on-error: true
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          disable-search: true
           # nextest resolves the configured junit path inside
           # target/nextest/<profile>/
-          files: target/nextest/ci/junit.xml
+          file: target/nextest/ci/junit.xml
       - name: keep JUnit report as artifact
         uses: actions/upload-artifact@v4
         if: always()
